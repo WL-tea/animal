@@ -25,6 +25,24 @@
 - **HTML + CSS + JS** — 纯前端渲染，无框架
 - **Node.js** — 文件监听与数据读取
 
+## 当前开发方式
+
+推荐先运行：
+
+```bash
+npm start
+```
+
+如果误用了 `node main.js`，项目也会自动转交给 Electron 启动。
+
+注意：在普通 Node.js 环境里执行 `require("electron")` 时，得到的是 Electron 可执行文件路径，这是正常现象；只有通过 `electron .` 启动应用时，主进程里才会拿到 `app`、`BrowserWindow` 等 Electron API。可以用下面的命令检查：
+
+```bash
+npm run check:electron
+```
+
+目前页面已经可以显示一个 CSS 几何宠物，支持自动走动、拖拽和简短气泡。
+
 ## 版本路线
 
 | 阶段 | 功能 |

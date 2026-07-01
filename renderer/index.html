@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>桌宠</title>
+    <link rel="stylesheet" href="css/pet.css" />
+    <link rel="stylesheet" href="css/detail.css" />
+</head>
+<body>
+    <!-- 宠物本体：只有容器，外观由 CSS 决定 -->
+    <div id="pet"></div>
+    <div id="bubble" hidden></div>
+
+    <!-- 详情窗口（默认隐藏） -->
+    <div id="detail-panel" hidden>
+        <div id="detail-sidebar">
+            <h3>项目</h3>
+            <div id="detail-list"></div>
+        </div>
+        <div id="detail-content">
+            <div class="detail-empty">正在加载数据...</div>
+        </div>
+        <button id="detail-close">✕</button>
+    </div>
+
+    <script src="js/pet.js"></script>
+    <script src="js/detail.js"></script>
+</body>
+</html>

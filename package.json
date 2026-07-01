@@ -1,0 +1,16 @@
+{
+  "name": "animal",
+  "version": "1.0.0",
+  "description": "功能型桌面宠物",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "start:cmd": "cmd.exe /c electron .",
+    "start:node": "node main.js",
+    "check:electron": "node -e \"const electron=require('electron'); console.log(typeof electron === 'string' ? 'Node sees Electron as executable: '+electron : 'Electron API loaded')\""
+  },
+  "devDependencies": {
+    "electron": "^30.0.0"
+  },
+  "private": true
+}
