@@ -30,9 +30,9 @@
 - `docs/notes/04-暴露与事件总线.md`：当前事件总线改造的知识背景。
 - `docs/notes/05-Git分支与提交节奏.md`：分支、提交和推送规则。
 
-当前进度：已完成 `app.js` 事件总线骨架、`bubble.js` 气泡拆分，以及 `detail:open`、`bubble:say`、`pet:moved` 事件迁移。
+当前进度：已完成 `app.js` 事件总线骨架、`bubble.js` 气泡拆分，以及 `detail:open`、`bubble:say`、`pet:moved` 事件迁移；已将 CC 数据入口从 `detail.js` 迁移到 `app.js`，新增 `cc:update` 事件，形成 `cc-monitor -> preload -> app.js -> detail.js` 的单向数据流。
 
-下一步优先方向：将 CC 数据入口从 `detail.js` 迁移到 `app.js`，形成 `cc-monitor -> preload -> app.js -> detail.js` 的单向数据流，并新增 `cc:update` 事件。
+下一步优先方向：基于 `cc:update` 做 CC 告警气泡，例如上下文接近阈值时由 `app.js` 判断状态，再通过 `bubble:say` 请求 `bubble.js` 显示提醒。
 
 ## 构建、测试与开发命令
 
@@ -82,6 +82,7 @@ node --check main.js
 - `detail:open`：请求打开详情面板，由 `detail.js` 监听并执行打开逻辑。
 - `bubble:say`：请求气泡显示一句话，由 `bubble.js` 监听并负责显示、隐藏和计时。
 - `pet:moved`：宠物位置发生变化，由 `bubble.js` 监听并重新定位气泡。
+- `cc:update`：CC 数据发生变化，由 `app.js` 发出，`detail.js` 监听并刷新详情面板。
 
 模块职责边界按“谁负责 UI，谁操作 DOM”执行：`pet.js` 只负责 `#pet` 的位置、拖拽、走动和宠物交互；`bubble.js` 只负责 `#bubble` 的文字、显示隐藏和定位；`detail.js` 只负责 `#detail-panel` 及其内部渲染；`app.js` 只负责公共事件能力和后续页面级状态，不应塞入具体 UI 渲染细节。
 
