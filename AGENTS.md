@@ -9,9 +9,9 @@
 - `cc-monitor.js`：Node 侧 Claude Code 数据读取与文件监听模块。
 - `renderer/index.html`：渲染进程入口页面。
 - `renderer/css/`：桌宠本体、气泡、详情面板和后续设置面板样式。
-- `renderer/js/`：桌宠移动、拖拽、详情渲染等页面行为；目标结构会继续拆分 `app.js`、`bubble.js`、`settings.js`、`pet-states.js`。
+- `renderer/js/`：渲染进程页面行为。当前已有 `app.js` 事件总线、`pet.js` 桌宠移动/拖拽、`bubble.js` 气泡显示/定位、`detail.js` 详情渲染；后续继续拆分 `settings.js`、`pet-states.js`。
 - `docs/superpowers/specs/`：产品与架构设计文档。
-- `docs/notes/`：学习笔记，记录 Node.js、Electron、CSS/JS 分工和事件驱动等概念。
+- `docs/notes/`：学习笔记，记录 Node.js、Electron、CSS/JS 分工、事件驱动、Git 分支与提交节奏等概念。
 
 运行时用户数据应放在 `data/` 下，并默认保持忽略，除非明确需要提交。
 
@@ -48,11 +48,21 @@ node --check main.js
 
 现有提交使用简短中文摘要，可带 emoji，例如 `📖 添加 README`。后续提交应保持简洁，说明本次改动的目的。Pull Request 需要描述用户可见行为、列出主要改动模块；涉及界面变化时应附截图。
 
+推荐 Git 节奏：一个学习主题或功能使用一个清晰分支名，例如 `event-bus`、`settings-panel`、`cc-alerts`；一个可解释的小目标完成并通过基本验证后再提交。提交前检查是否能用一句话说明改动、是否运行过必要的 `node --check`、是否混入不相关文件、是否需要新增或更新 `docs/notes/` 学习笔记。
+
 ## 架构与学习说明
 
 项目目标不仅是完成应用，也包括理解 Electron、IPC、DOM、CSS、文件监听和数据流。交互采用三层模型：宠物本体、临时对话气泡、详情/设置窗口。
 
 目标架构是事件驱动和单向数据流：`cc-monitor -> app.js -> 各 UI 模块`。模块之间不应直接互相调用；新增功能优先通过 `app.js` 事件总线转发。当前实现仍处于 MVP 过渡阶段，若临时绕过目标结构，应在代码或交接说明中标明原因。
+
+当前已落地的渲染层事件包括：
+
+- `detail:open`：请求打开详情面板，由 `detail.js` 监听并执行打开逻辑。
+- `bubble:say`：请求气泡显示一句话，由 `bubble.js` 监听并负责显示、隐藏和计时。
+- `pet:moved`：宠物位置发生变化，由 `bubble.js` 监听并重新定位气泡。
+
+模块职责边界按“谁负责 UI，谁操作 DOM”执行：`pet.js` 只负责 `#pet` 的位置、拖拽、走动和宠物交互；`bubble.js` 只负责 `#bubble` 的文字、显示隐藏和定位；`detail.js` 只负责 `#detail-panel` 及其内部渲染；`app.js` 只负责公共事件能力和后续页面级状态，不应塞入具体 UI 渲染细节。
 
 贡献者修改代码时，应解释改动原因、运行机制和相关知识点，而不仅是汇报结果。推荐流程是：说明问题、指出相关文件、解释知识点、改一小步、运行验证、判断是否需要新增学习笔记。
 
