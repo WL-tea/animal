@@ -21,6 +21,19 @@
 
 运行时用户数据应放在 `data/` 下，并默认保持忽略，除非明确需要提交。
 
+## 项目计划与续接入口
+
+继续开发前应优先阅读以下文档，避免只看代码而忽略产品计划和学习路线：
+
+- `docs/superpowers/specs/2026-07-01-desktop-pet-design.md`：产品定位、MVP/V2/V3 路线、目标文件结构和模块通信原则。
+- `docs/notes/00-学习地图与协作方式.md`：学习阶段、协作流程和推荐开发节奏。
+- `docs/notes/04-暴露与事件总线.md`：当前事件总线改造的知识背景。
+- `docs/notes/05-Git分支与提交节奏.md`：分支、提交和推送规则。
+
+当前进度：已完成 `app.js` 事件总线骨架、`bubble.js` 气泡拆分，以及 `detail:open`、`bubble:say`、`pet:moved` 事件迁移。
+
+下一步优先方向：将 CC 数据入口从 `detail.js` 迁移到 `app.js`，形成 `cc-monitor -> preload -> app.js -> detail.js` 的单向数据流，并新增 `cc:update` 事件。
+
 ## 构建、测试与开发命令
 
 - `npm install`：安装 Electron 和项目依赖。
