@@ -1,5 +1,4 @@
 const pet = document.querySelector("#pet");
-const bubble = document.querySelector("#bubble");
 
 const state = {
     x: 140,
@@ -9,7 +8,6 @@ const state = {
     dragging: false,
     dragOffsetX: 0,
     dragOffsetY: 0,
-    bubbleTimer: null,
 };
 
 function clamp(value, min, max) {
@@ -26,27 +24,12 @@ function bounds() {
 function renderPet() {
     pet.style.left = `${state.x}px`;
     pet.style.top = `${state.y}px`;
-    renderBubble();
-}
-
-function renderBubble() {
-    if (bubble.hidden) {
-        return;
-    }
-
-    bubble.style.left = `${clamp(state.x + 10, 8, window.innerWidth - bubble.offsetWidth - 8)}px`;
-    bubble.style.top = `${Math.max(8, state.y - bubble.offsetHeight - 12)}px`;
-}
-
-function say(message, duration = 1800) {
-    bubble.textContent = message;
-    bubble.hidden = false;
-    renderBubble();
-
-    clearTimeout(state.bubbleTimer);
-    state.bubbleTimer = setTimeout(() => {
-        bubble.hidden = true;
-    }, duration);
+    window.petApp?.emit("pet:moved", {
+        x: state.x,
+        y: state.y,
+        width: pet.offsetWidth,
+        height: pet.offsetHeight,
+    });
 }
 
 function walk() {
@@ -96,14 +79,17 @@ pet.addEventListener("pointerup", (event) => {
     state.dragging = false;
     pet.releasePointerCapture(event.pointerId);
     pet.classList.remove("is-dragging");
-    say("我在这里。");
+    window.petApp?.emit("bubble:say", {
+        message: "我在这里。",
+        duration: 1800,
+    });
 });
 
 pet.addEventListener("dblclick", () => {
-    if (typeof showDetail === "function") {
-        showDetail();
+    if (window.petApp) {
+        window.petApp.emit("detail:open");
     } else {
-        say("详情窗口加载中...", 1200);
+        console.log("详情窗口加载中...");
     }
 });
 
@@ -115,5 +101,8 @@ window.addEventListener("resize", () => {
 });
 
 renderPet();
-say("宠物已加载");
+window.petApp?.emit("bubble:say", {
+    message: "宠物已加载",
+    duration: 1800,
+});
 requestAnimationFrame(walk);

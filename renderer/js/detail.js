@@ -169,6 +169,8 @@ function hideDetail() {
 document.addEventListener("DOMContentLoaded", () => {
     initDetail();
 
+    window.petApp?.on("detail:open", showDetail);
+
     // 关闭按钮
     document.querySelector("#detail-close")?.addEventListener("click", hideDetail);
 });
