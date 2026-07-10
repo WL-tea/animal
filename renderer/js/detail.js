@@ -70,6 +70,52 @@ function renderProjectList() {
     });
 }
 
+function formatContextPercentage(value) {
+    return `${Number(value.toFixed(2)).toLocaleString()}%`;
+}
+
+function formatContextLimit(value) {
+    if (value >= 1000000 && value % 1000000 === 0) {
+        return `${value / 1000000}M 上限`;
+    }
+
+    if (value >= 1000 && value % 1000 === 0) {
+        return `${value / 1000}K 上限`;
+    }
+
+    return `${value.toLocaleString()} 上限`;
+}
+
+function renderContextSection(proj) {
+    const contextWindowSize = proj.contextWindowSize;
+    const contextUsedPercentage = proj.contextUsedPercentage;
+    const hasContext = Number.isFinite(contextWindowSize)
+        && Number.isFinite(contextUsedPercentage);
+
+    if (!hasContext) {
+        return `
+            <div class="detail-section">
+                <div class="detail-label">上下文</div>
+                <div class="detail-empty">上下文数据不可用</div>
+            </div>
+        `;
+    }
+
+    const progressWidth = Math.min(100, Math.max(0, contextUsedPercentage));
+    return `
+        <div class="detail-section">
+            <div class="detail-label">上下文</div>
+            <div class="progress-bar">
+                <div class="progress-fill" style="width:${progressWidth}%"></div>
+            </div>
+            <div class="detail-stats">
+                <span>${formatContextPercentage(contextUsedPercentage)}</span>
+                <span>${formatContextLimit(contextWindowSize)}</span>
+            </div>
+        </div>
+    `;
+}
+
 function renderProjectDetail() {
     const contentEl = document.querySelector("#detail-content");
     if (!contentEl) return;
@@ -86,7 +132,6 @@ function renderProjectDetail() {
     const inputTokens = rawInputTokens.toLocaleString();
     const outputTokens = rawOutputTokens.toLocaleString();
     const cacheTokens = (rawCacheTokens / 1024 / 1024).toFixed(1);
-    const contextPercent = Math.min(100, Math.round((rawInputTokens / 200000) * 100));
 
     const modelRows = Object.entries(proj.lastModelUsage || {})
         .map(([model, usage]) => `
@@ -105,16 +150,7 @@ function renderProjectDetail() {
             </span>
         </div>
 
-        <div class="detail-section">
-            <div class="detail-label">上下文</div>
-            <div class="progress-bar">
-                <div class="progress-fill" style="width:${contextPercent}%"></div>
-            </div>
-            <div class="detail-stats">
-                <span>${contextPercent}%</span>
-                <span>200K 上限</span>
-            </div>
-        </div>
+        ${renderContextSection(proj)}
 
         <div class="detail-section">
             <div class="detail-label">Token 统计</div>
