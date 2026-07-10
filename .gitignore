@@ -1,4 +1,5 @@
 node_modules/
+.worktrees/
 data/settings.json
 data/projects.json
 dist/
