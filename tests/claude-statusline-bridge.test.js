@@ -80,4 +80,17 @@ try {
     fs.rmSync(tempRoot, { recursive: true, force: true });
 }
 
+const escapeRoot = fs.mkdtempSync(path.join(os.tmpdir(), "animal-statusline-escape-"));
+const snapshotDir = path.join(escapeRoot, "snapshots");
+const escapedFilepath = path.join(escapeRoot, "escape.json");
+try {
+    assert.throws(() => writeSnapshot({
+        ...snapshot,
+        sessionId: "../escape",
+    }, snapshotDir), /Invalid session ID/);
+    assert.strictEqual(fs.existsSync(escapedFilepath), false);
+} finally {
+    fs.rmSync(escapeRoot, { recursive: true, force: true });
+}
+
 console.log("claude statusLine bridge ok");

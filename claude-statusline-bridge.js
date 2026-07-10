@@ -73,6 +73,10 @@ function normalizeStatusInput(input, updatedAt = Date.now()) {
 }
 
 function writeSnapshot(snapshot, snapshotDir = DEFAULT_SNAPSHOT_DIR) {
+    if (!SESSION_ID_PATTERN.test(snapshot?.sessionId || "")) {
+        throw new Error("Invalid session ID");
+    }
+
     fs.mkdirSync(snapshotDir, { recursive: true });
     const filepath = path.join(snapshotDir, `${snapshot.sessionId}.json`);
     const temporaryPath = `${filepath}.${process.pid}.tmp`;
