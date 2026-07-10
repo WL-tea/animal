@@ -2,5 +2,7 @@ node_modules/
 .worktrees/
 data/settings.json
 data/projects.json
+data/cc-sessions/
+data/statusline-backup.json
 dist/
 *.log
