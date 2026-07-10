@@ -995,12 +995,12 @@ Verify that `git status --short` does not list this ignored file.
 
 - [ ] **Step 3: Replace only the user statusLine object**
 
-Use `apply_patch` on `C:/Users/lenovo/.claude/settings.json` to replace the existing `statusLine` value with:
+Use `apply_patch` on `C:/Users/lenovo/.claude/settings.json` to replace the existing `statusLine` value with the temporary worktree command:
 
 ```json
 "statusLine": {
     "type": "command",
-    "command": "node \"E:/kaifa/animal/claude-statusline-bridge.js\""
+    "command": "node \"E:/kaifa/animal/.worktrees/statusline-monitor/claude-statusline-bridge.js\""
 }
 ```
 
@@ -1011,15 +1011,15 @@ Do not change the `env`, plugin, language, theme, or other settings fields.
 Run:
 
 ```powershell
-node -e "const fs=require('fs');const p=process.env.USERPROFILE+'/.claude/settings.json';const d=JSON.parse(fs.readFileSync(p,'utf8'));if(!d.statusLine?.command.includes('claude-statusline-bridge.js'))process.exit(1);console.log('statusLine config ok')"
+node -e "const fs=require('fs');const p=process.env.USERPROFILE+'/.claude/settings.json';const d=JSON.parse(fs.readFileSync(p,'utf8'));if(!d.statusLine?.command.includes('.worktrees/statusline-monitor/claude-statusline-bridge.js'))process.exit(1);console.log('temporary statusLine config ok')"
 git status --short
 ```
 
-Expected: `statusLine config ok`; neither user settings nor ignored runtime data appears in repository status.
+Expected: `temporary statusLine config ok`; neither user settings nor ignored runtime data appears in repository status.
 
 - [ ] **Step 5: Trigger one Claude Code update and inspect the sanitized snapshot**
 
-Open or continue a trusted Claude Code session in `E:/kaifa/animal` and send one minimal message such as `回复 OK`.
+Open or continue a trusted Claude Code session in `E:/kaifa/animal/.worktrees/statusline-monitor` and send one minimal message such as `回复 OK`.
 
 Expected visible result: the status line still has the form `DeepSeek [#.........] 19%`, with the bar reflecting the current percentage.
 
@@ -1032,7 +1032,7 @@ $snapshot | Select-Object source,sessionId,projectPath,updatedAt
 $snapshot.context | Select-Object windowSize,usedPercentage,totalInputTokens,totalOutputTokens
 ```
 
-Expected: `source` is `claude-code`, `projectPath` is `E:/kaifa/animal`, `windowSize` is `1000000`, and no prompt, response, token, or transcript fields exist outside the documented numeric usage fields.
+Expected: `source` is `claude-code`, `projectPath` is `E:/kaifa/animal/.worktrees/statusline-monitor`, `windowSize` is `1000000`, and no prompt, response, token, or transcript fields exist outside the documented numeric usage fields.
 
 - [ ] **Step 6: Run Electron manual verification**
 
@@ -1084,3 +1084,12 @@ If the bridge interferes with Claude Code, use the ignored backup as the source 
 2. Use `apply_patch` to replace only `statusLine` in `C:/Users/lenovo/.claude/settings.json` with the backed-up object.
 3. Start a new Claude Code interaction and confirm the original Python-rendered status line returns.
 4. Keep repository code and tests intact; rollback of user configuration does not require reverting commits.
+
+## Post-Integration Stable Path
+
+After the reviewed `statusline-monitor` branch is locally integrated into `event-bus`, and before deleting the worktree:
+
+1. Use `apply_patch` to change only the statusLine command in `C:/Users/lenovo/.claude/settings.json` to `node \"E:/kaifa/animal/claude-statusline-bridge.js\"`.
+2. Parse the settings file with Node and verify that the command contains `E:/kaifa/animal/claude-statusline-bridge.js` and does not contain `.worktrees`.
+3. Start one Claude Code interaction from `E:/kaifa/animal` and verify that `E:/kaifa/animal/data/cc-sessions/` receives the new snapshot.
+4. Only after those checks pass, remove the temporary worktree through the finishing-branch workflow.
