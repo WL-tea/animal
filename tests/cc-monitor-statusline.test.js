@@ -97,6 +97,20 @@ try {
     fs.writeFileSync(filepath, JSON.stringify({ ...snapshots[0], schemaVersion: 2 }), "utf-8");
     monitor.readSnapshotFile(filepath);
     assert.deepStrictEqual(monitor.sessionSnapshots.get(filename), snapshots[0]);
+
+    const malformedContexts = [
+        { ...snapshots[0].context, remainingPercentage: "20" },
+        { ...snapshots[0].context, totalInputTokens: {} },
+        { ...snapshots[0].context, totalOutputTokens: -1 },
+    ];
+
+    for (const context of malformedContexts) {
+        fs.writeFileSync(filepath, JSON.stringify({ ...snapshots[0], context }), "utf-8");
+        monitor.readSnapshotFile(filepath);
+        assert.deepStrictEqual(monitor.sessionSnapshots.get(filename), snapshots[0]);
+    }
+
+    assert.strictEqual(loggedErrors.length, 1);
 } finally {
     console.error = originalConsoleError;
     fs.rmSync(tempRoot, { recursive: true, force: true });

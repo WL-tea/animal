@@ -29,6 +29,18 @@ function isValidContext(context) {
         && isFiniteNumber(context?.usedPercentage)
         && context.usedPercentage >= 0
         && context.usedPercentage <= 100
+        && (
+            context.remainingPercentage === null
+            || (
+                isFiniteNumber(context.remainingPercentage)
+                && context.remainingPercentage >= 0
+                && context.remainingPercentage <= 100
+            )
+        )
+        && isFiniteNumber(context.totalInputTokens)
+        && context.totalInputTokens >= 0
+        && isFiniteNumber(context.totalOutputTokens)
+        && context.totalOutputTokens >= 0
     );
 }
 
