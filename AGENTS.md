@@ -6,6 +6,14 @@
 
 每次修改文件前，必须先向用户说明：本次要解决什么问题、为什么需要修改这些文件、修改后会带来什么效果，以及涉及的关键知识点。只有在用户明确确认后，才能开始实际修改文件。
 
+### 当前 Bug 与 GitHub Issue 入口
+
+GitHub Issue 是项目问题的唯一事实来源，不在仓库内维护内容重复的 Issue 说明文档。当前未关闭的问题统一从 [GitHub Issues](https://github.com/WL-tea/animal/issues?q=is%3Aissue%20state%3Aopen) 查看。
+
+开始处理项目问题前，应优先通过 GitHub 连接器读取未关闭的 Issue，并根据 Issue 中的现象、复现步骤、预期行为和相关上下文开展分析。用户在专门的问题记录对话中提出新的具体项目问题时，应将完整问题创建为 GitHub Issue，后续进展和关闭状态也以该 Issue 为准。
+
+如果当前环境无法访问 GitHub Issue，应明确告知用户并重试或请用户提供 Issue 链接与内容；不得将“读取失败”视为“当前没有 Bug”。
+
 ## 项目结构与模块组织
 
 本仓库是一个基于 Electron 的功能型桌面宠物项目，渲染层使用原生 HTML、CSS 和 JavaScript。
