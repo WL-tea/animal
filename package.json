@@ -8,7 +8,7 @@
     "start:cmd": "cmd.exe /c electron .",
     "start:node": "node main.js",
     "check:electron": "node -e \"const electron=require('electron'); console.log(typeof electron === 'string' ? 'Node sees Electron as executable: '+electron : 'Electron API loaded')\"",
-    "test": "node tests/app-cc-flow.test.js && node tests/claude-statusline-bridge.test.js && node tests/cc-monitor-statusline.test.js && node tests/detail-context.test.js"
+    "test": "node tests/app-cc-flow.test.js && node tests/claude-statusline-bridge.test.js && node tests/cc-monitor-statusline.test.js && node tests/detail-context.test.js && node tests/main-monitor-lifecycle.test.js"
   },
   "devDependencies": {
     "electron": "^30.0.0"

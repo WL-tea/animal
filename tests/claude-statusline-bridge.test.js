@@ -39,6 +39,10 @@ const sampleInput = {
         total_api_duration_ms: 3200,
     },
     transcript_path: "C:/private/conversation.jsonl",
+    prompt: "secret prompt",
+    response: "secret response",
+    api_key: "secret credential",
+    credentials: { token: "secret token" },
 };
 
 const updatedAt = 1783660000000;
@@ -52,7 +56,40 @@ assert.strictEqual(snapshot.context.windowSize, 1000000);
 assert.strictEqual(snapshot.context.usedPercentage, 19.9573);
 assert.strictEqual(snapshot.context.totalInputTokens, 199573);
 assert.strictEqual(snapshot.updatedAt, updatedAt);
-assert.strictEqual(Object.hasOwn(snapshot, "transcriptPath"), false);
+assert.deepStrictEqual(Object.keys(snapshot), [
+    "schemaVersion",
+    "source",
+    "sessionId",
+    "projectPath",
+    "currentDirectory",
+    "model",
+    "context",
+    "cost",
+    "updatedAt",
+]);
+assert.deepStrictEqual(Object.keys(snapshot.model), ["id", "displayName"]);
+assert.deepStrictEqual(Object.keys(snapshot.context), [
+    "windowSize",
+    "usedPercentage",
+    "remainingPercentage",
+    "totalInputTokens",
+    "totalOutputTokens",
+]);
+assert.deepStrictEqual(Object.keys(snapshot.cost), [
+    "totalCostUsd",
+    "totalDurationMs",
+    "totalApiDurationMs",
+]);
+const serializedSnapshot = JSON.stringify(snapshot);
+for (const excludedValue of [
+    sampleInput.transcript_path,
+    sampleInput.prompt,
+    sampleInput.response,
+    sampleInput.api_key,
+    sampleInput.credentials.token,
+]) {
+    assert.strictEqual(serializedSnapshot.includes(excludedValue), false);
+}
 assert.strictEqual(formatStatusLine(sampleInput), "DeepSeek [#.........] 19%");
 
 const noContext = normalizeStatusInput({

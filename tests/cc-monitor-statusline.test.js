@@ -2,6 +2,7 @@ const assert = require("assert");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
+const { EventEmitter } = require("events");
 
 const CCMonitor = require("../cc-monitor");
 
@@ -111,9 +112,80 @@ try {
     }
 
     assert.strictEqual(loggedErrors.length, 1);
+
+    const mismatchedFilename = `${snapshots[1].sessionId}.json`;
+    const mismatchedPath = path.join(tempRoot, mismatchedFilename);
+    fs.writeFileSync(mismatchedPath, JSON.stringify(snapshots[0]), "utf-8");
+    monitor.readSnapshotFile(mismatchedPath);
+    assert.strictEqual(monitor.sessionSnapshots.has(mismatchedFilename), false);
 } finally {
     console.error = originalConsoleError;
     fs.rmSync(tempRoot, { recursive: true, force: true });
+}
+
+const failureRoot = fs.mkdtempSync(path.join(os.tmpdir(), "animal-monitor-failure-"));
+const failureFilename = `${snapshots[0].sessionId}.json`;
+const failurePath = path.join(failureRoot, failureFilename);
+fs.writeFileSync(failurePath, JSON.stringify(snapshots[0]), "utf-8");
+
+const sentUpdates = [];
+const webContents = {
+    isDestroyed: () => false,
+    send: (_channel, payload) => sentUpdates.push(payload),
+};
+const failureMonitor = new CCMonitor(webContents, { snapshotDir: failureRoot });
+failureMonitor.projects = [projectPath];
+failureMonitor.backupData = backupData;
+
+const originalMkdirSync = fs.mkdirSync;
+const failureConsoleError = console.error;
+console.error = (...args) => loggedErrors.push(args);
+try {
+    fs.mkdirSync = () => {
+        throw new Error("snapshot directory unavailable");
+    };
+    assert.doesNotThrow(() => failureMonitor.startSnapshotWatching());
+    assert.strictEqual(sentUpdates.at(-1).projects[projectPath].lastCost, 2.5);
+    assert.deepStrictEqual(sentUpdates.at(-1).projects[projectPath].sessions, []);
+    assert.strictEqual(sentUpdates.at(-1).projects[projectPath].contextWindowSize, null);
+} finally {
+    fs.mkdirSync = originalMkdirSync;
+}
+
+failureMonitor.refreshSnapshots();
+assert.strictEqual(sentUpdates.at(-1).projects[projectPath].sessions.length, 1);
+
+const originalReaddirSync = fs.readdirSync;
+try {
+    fs.readdirSync = () => {
+        throw new Error("snapshot enumeration unavailable");
+    };
+    assert.doesNotThrow(() => failureMonitor.refreshSnapshots());
+    assert.strictEqual(failureMonitor.sessionSnapshots.size, 1);
+    assert.deepStrictEqual(sentUpdates.at(-1).projects[projectPath].sessions, []);
+    assert.strictEqual(sentUpdates.at(-1).projects[projectPath].lastCost, 2.5);
+} finally {
+    fs.readdirSync = originalReaddirSync;
+}
+
+failureMonitor.refreshSnapshots();
+assert.strictEqual(sentUpdates.at(-1).projects[projectPath].sessions.length, 1);
+
+const watcher = new EventEmitter();
+watcher.close = () => {};
+const originalWatch = fs.watch;
+try {
+    fs.watch = () => watcher;
+    failureMonitor.startSnapshotWatching();
+    assert.doesNotThrow(() => watcher.emit("error", new Error("watcher failed")));
+    assert.strictEqual(failureMonitor.sessionSnapshots.size, 1);
+    assert.deepStrictEqual(sentUpdates.at(-1).projects[projectPath].sessions, []);
+    assert.strictEqual(sentUpdates.at(-1).projects[projectPath].lastCost, 2.5);
+} finally {
+    fs.watch = originalWatch;
+    console.error = failureConsoleError;
+    failureMonitor.stopWatching();
+    fs.rmSync(failureRoot, { recursive: true, force: true });
 }
 
 console.log("cc monitor statusLine merge ok");

@@ -48,11 +48,19 @@ function createWindow() {
     win.loadFile(path.join(__dirname, "renderer", "index.html"));
 
     // 启动 CC 监控（连接到这个窗口）
-    ccMonitor = new CCMonitor(win.webContents);
-    ccMonitor.setProjects([
+    const windowMonitor = new CCMonitor(win.webContents);
+    ccMonitor = windowMonitor;
+    windowMonitor.setProjects([
         __dirname,  // 默认监控当前项目
     ]);
-    ccMonitor.refresh();
+    windowMonitor.refresh();
+
+    win.on("closed", () => {
+        windowMonitor.stopWatching();
+        if (ccMonitor === windowMonitor) {
+            ccMonitor = null;
+        }
+    });
 }
 
 // 页面请求刷新数据时响应

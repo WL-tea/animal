@@ -105,6 +105,7 @@ class CCMonitor {
         this.snapshotWatcher = null;
         this.backupData = {};             // 缓存的最新 backup 数据
         this.sessionSnapshots = new Map();
+        this.snapshotAvailable = false;
         this.snapshotDir = options.snapshotDir || path.join(__dirname, "data", "cc-sessions");
     }
 
@@ -136,26 +137,42 @@ class CCMonitor {
     startSnapshotWatching() {
         if (this.snapshotWatcher) return;
 
-        fs.mkdirSync(this.snapshotDir, { recursive: true });
-        this.refreshSnapshots();
-        this.snapshotWatcher = fs.watch(this.snapshotDir, (_eventType, filename) => {
-            if (!filename || !filename.endsWith(".json")) return;
+        try {
+            fs.mkdirSync(this.snapshotDir, { recursive: true });
+            this.refreshSnapshots();
+            this.snapshotWatcher = fs.watch(this.snapshotDir, (_eventType, filename) => {
+                if (!filename || !filename.endsWith(".json")) return;
 
-            const filepath = path.join(this.snapshotDir, filename);
-            if (!fs.existsSync(filepath)) {
-                this.sessionSnapshots.delete(filename);
+                const filepath = path.join(this.snapshotDir, filename);
+                if (!fs.existsSync(filepath)) {
+                    this.sessionSnapshots.delete(filename);
+                    this.sendToRenderer();
+                    return;
+                }
+
+                this.readSnapshotFile(filepath);
+            });
+            this.snapshotWatcher.on("error", (err) => {
+                console.error("[CC] statusLine 快照监听失败:", err.message);
+                this.snapshotWatcher?.close();
+                this.snapshotWatcher = null;
+                this.snapshotAvailable = false;
                 this.sendToRenderer();
-                return;
-            }
-
-            this.readSnapshotFile(filepath);
-        });
+            });
+        } catch (err) {
+            console.error("[CC] 启动 statusLine 快照监听失败:", err.message);
+            this.snapshotWatcher?.close();
+            this.snapshotWatcher = null;
+            this.snapshotAvailable = false;
+            this.sendToRenderer();
+        }
     }
 
     readSnapshotFile(filepath) {
         try {
             const snapshot = JSON.parse(fs.readFileSync(filepath, "utf-8"));
             if (!isValidStatusSnapshot(snapshot)) return;
+            if (path.basename(filepath) !== `${snapshot.sessionId}.json`) return;
 
             this.sessionSnapshots.set(path.basename(filepath), snapshot);
             this.sendToRenderer();
@@ -165,18 +182,25 @@ class CCMonitor {
     }
 
     refreshSnapshots() {
-        fs.mkdirSync(this.snapshotDir, { recursive: true });
-        const files = fs.readdirSync(this.snapshotDir).filter((filename) => filename.endsWith(".json"));
-        const existingFiles = new Set(files);
+        try {
+            fs.mkdirSync(this.snapshotDir, { recursive: true });
+            const files = fs.readdirSync(this.snapshotDir).filter((filename) => filename.endsWith(".json"));
+            const existingFiles = new Set(files);
 
-        for (const filename of this.sessionSnapshots.keys()) {
-            if (!existingFiles.has(filename)) {
-                this.sessionSnapshots.delete(filename);
+            for (const filename of this.sessionSnapshots.keys()) {
+                if (!existingFiles.has(filename)) {
+                    this.sessionSnapshots.delete(filename);
+                }
             }
-        }
 
-        for (const filename of files) {
-            this.readSnapshotFile(path.join(this.snapshotDir, filename));
+            for (const filename of files) {
+                this.readSnapshotFile(path.join(this.snapshotDir, filename));
+            }
+
+            this.snapshotAvailable = true;
+        } catch (err) {
+            console.error("[CC] 刷新 statusLine 快照失败:", err.message);
+            this.snapshotAvailable = false;
         }
 
         this.sendToRenderer();
@@ -221,7 +245,7 @@ class CCMonitor {
             const projects = mergeProjectData(
                 this.projects,
                 this.backupData,
-                Array.from(this.sessionSnapshots.values()),
+                this.snapshotAvailable ? Array.from(this.sessionSnapshots.values()) : [],
             );
 
             this.webContents.send("cc-update", {
