@@ -150,7 +150,10 @@ class CCMonitor {
                     return;
                 }
 
-                this.readSnapshotFile(filepath);
+                if (this.readSnapshotFile(filepath)) {
+                    this.snapshotAvailable = true;
+                    this.sendToRenderer();
+                }
             });
             this.snapshotWatcher.on("error", (err) => {
                 console.error("[CC] statusLine 快照监听失败:", err.message);
@@ -171,13 +174,15 @@ class CCMonitor {
     readSnapshotFile(filepath) {
         try {
             const snapshot = JSON.parse(fs.readFileSync(filepath, "utf-8"));
-            if (!isValidStatusSnapshot(snapshot)) return;
-            if (path.basename(filepath) !== `${snapshot.sessionId}.json`) return;
+            if (!isValidStatusSnapshot(snapshot)) return false;
+            if (path.basename(filepath) !== `${snapshot.sessionId}.json`) return false;
 
             this.sessionSnapshots.set(path.basename(filepath), snapshot);
             this.sendToRenderer();
+            return true;
         } catch (err) {
             console.error("[CC] 读取 statusLine 快照失败:", err.message);
+            return false;
         }
     }
 
@@ -270,7 +275,11 @@ class CCMonitor {
             }
         }
 
-        this.refreshSnapshots();
+        if (this.snapshotWatcher) {
+            this.refreshSnapshots();
+        } else {
+            this.startSnapshotWatching();
+        }
     }
 
     // 停止监听

@@ -188,4 +188,87 @@ try {
     fs.rmSync(failureRoot, { recursive: true, force: true });
 }
 
+const recoveryRoot = fs.mkdtempSync(path.join(os.tmpdir(), "animal-monitor-recovery-"));
+const recoveryPath = path.join(recoveryRoot, failureFilename);
+fs.writeFileSync(recoveryPath, JSON.stringify(snapshots[0]), "utf-8");
+const recoveryUpdates = [];
+const recoveryMonitor = new CCMonitor({
+    isDestroyed: () => false,
+    send: (_channel, payload) => recoveryUpdates.push(payload),
+}, { snapshotDir: recoveryRoot });
+recoveryMonitor.projects = [projectPath];
+recoveryMonitor.backupData = backupData;
+
+let replacementWatcher = null;
+const originalExistsSync = fs.existsSync;
+console.error = () => {};
+try {
+    fs.mkdirSync = () => {
+        throw new Error("transient startup failure");
+    };
+    recoveryMonitor.startSnapshotWatching();
+    assert.strictEqual(recoveryMonitor.snapshotWatcher, null);
+
+    fs.mkdirSync = originalMkdirSync;
+    fs.existsSync = (filepath) => filepath === recoveryRoot || filepath === recoveryPath;
+    fs.watch = () => {
+        replacementWatcher = new EventEmitter();
+        replacementWatcher.close = () => {};
+        return replacementWatcher;
+    };
+    recoveryMonitor.refresh();
+    assert.ok(replacementWatcher, "refresh should install a replacement snapshot watcher");
+    assert.strictEqual(recoveryMonitor.snapshotWatcher, replacementWatcher);
+
+    replacementWatcher.emit("error", new Error("transient watcher failure"));
+    assert.strictEqual(recoveryMonitor.snapshotWatcher, null);
+    recoveryMonitor.refresh();
+    assert.notStrictEqual(recoveryMonitor.snapshotWatcher, null);
+} finally {
+    fs.mkdirSync = originalMkdirSync;
+    fs.existsSync = originalExistsSync;
+    fs.watch = originalWatch;
+    console.error = failureConsoleError;
+    recoveryMonitor.stopWatching();
+    fs.rmSync(recoveryRoot, { recursive: true, force: true });
+}
+
+const eventRoot = fs.mkdtempSync(path.join(os.tmpdir(), "animal-monitor-event-recovery-"));
+const eventPath = path.join(eventRoot, failureFilename);
+fs.writeFileSync(eventPath, JSON.stringify(snapshots[0]), "utf-8");
+const eventUpdates = [];
+const eventMonitor = new CCMonitor({
+    isDestroyed: () => false,
+    send: (_channel, payload) => eventUpdates.push(payload),
+}, { snapshotDir: eventRoot });
+eventMonitor.projects = [projectPath];
+eventMonitor.backupData = backupData;
+
+let watcherCallback = null;
+const eventWatcher = new EventEmitter();
+eventWatcher.close = () => {};
+console.error = () => {};
+try {
+    fs.readdirSync = () => {
+        throw new Error("transient enumeration failure");
+    };
+    fs.watch = (_directory, callback) => {
+        watcherCallback = callback;
+        return eventWatcher;
+    };
+    eventMonitor.startSnapshotWatching();
+    assert.deepStrictEqual(eventUpdates.at(-1).projects[projectPath].sessions, []);
+
+    fs.readdirSync = originalReaddirSync;
+    watcherCallback("change", failureFilename);
+    assert.strictEqual(eventUpdates.at(-1).projects[projectPath].sessions.length, 1);
+    assert.strictEqual(eventUpdates.at(-1).projects[projectPath].contextWindowSize, 1000000);
+} finally {
+    fs.readdirSync = originalReaddirSync;
+    fs.watch = originalWatch;
+    console.error = failureConsoleError;
+    eventMonitor.stopWatching();
+    fs.rmSync(eventRoot, { recursive: true, force: true });
+}
+
 console.log("cc monitor statusLine merge ok");
