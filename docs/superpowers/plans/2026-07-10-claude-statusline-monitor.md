@@ -1,5 +1,9 @@
 # Claude Code statusLine Monitor Implementation Plan
 
+> **状态：已完成，仅作历史实施记录。** statusLine 桥接、快照监控、真实上下文渲染、错误降级和监听恢复已经落地。当前行为以仓库代码、测试、设计文档和 GitHub Issue 为准。
+>
+> 文中的 `E:/kaifa/animal`、临时 worktree 和 `C:/Users/lenovo/.claude/settings.json` 命令记录的是实施时环境，其他机器或仓库移动后不能直接照搬。下方未勾选的步骤保留用于复盘当时的任务拆分，不表示功能仍未完成。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Replace the simulated 200K context calculation with accurate Claude Code statusLine snapshots while preserving the existing status bar and backup-based aggregate statistics.
