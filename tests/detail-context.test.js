@@ -70,4 +70,31 @@ context.renderProjectDetail();
 assert.match(content.innerHTML, /上下文数据不可用/);
 assert.doesNotMatch(content.innerHTML, /0%/);
 
+panel.hidden = false;
+context.updateProjectList({
+    projects: {
+        "E:\\projects\\<img src=x onerror=\"attack()\">": {
+            contextWindowSize: 200000,
+            contextUsedPercentage: 50,
+            lastModelUsage: {
+                "<script>attack()</script> & \"quoted\" 'single'": {
+                    inputTokens: 10,
+                    outputTokens: 5,
+                    costUSD: 0.25,
+                },
+            },
+        },
+    },
+});
+context.renderProjectList();
+context.renderProjectDetail();
+
+assert.doesNotMatch(list.innerHTML, /<img/);
+assert.doesNotMatch(content.innerHTML, /<script/);
+assert.match(list.innerHTML, /&lt;img src=x onerror=&quot;attack\(\)&quot;&gt;/);
+assert.match(
+    content.innerHTML,
+    /&lt;script&gt;attack\(\)&lt;\/script&gt; &amp; &quot;quoted&quot; &#39;single&#39;/,
+);
+
 console.log("detail context rendering ok");

@@ -7,6 +7,16 @@ function getProjectName(projectPath) {
     return projectPath.split("\\").pop() || projectPath.split("/").pop() || projectPath;
 }
 
+function escapeHtml(value) {
+    return String(value ?? "").replace(/[&<>"']/g, (character) => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        "\"": "&quot;",
+        "'": "&#39;",
+    })[character]);
+}
+
 function updateProjectList(data) {
     projectList = Object.entries(data?.projects || {}).map(([projectPath, stats]) => ({
         path: projectPath,
@@ -54,7 +64,7 @@ function renderProjectList() {
         return `
             <div class="detail-project ${isActive ? "active" : ""}" data-index="${index}">
                 <span class="status-dot ${isOnline ? "online" : "offline"}"></span>
-                <span class="project-name">${proj.name}</span>
+                <span class="project-name">${escapeHtml(proj.name)}</span>
             </div>
         `;
     }).join("");
@@ -136,7 +146,7 @@ function renderProjectDetail() {
     const modelRows = Object.entries(proj.lastModelUsage || {})
         .map(([model, usage]) => `
             <div class="detail-model-row">
-                <span class="model-name">${model}</span>
+                <span class="model-name">${escapeHtml(model)}</span>
                 <span class="model-tokens">I:${(usage.inputTokens || 0).toLocaleString()} O:${(usage.outputTokens || 0).toLocaleString()}</span>
                 <span class="model-cost">$${(usage.costUSD || 0).toFixed(2)}</span>
             </div>
@@ -144,7 +154,7 @@ function renderProjectDetail() {
 
     contentEl.innerHTML = `
         <div class="detail-header">
-            <h2>${proj.name}</h2>
+            <h2>${escapeHtml(proj.name)}</h2>
             <span class="status-badge ${proj.lastDuration > 0 ? "online" : "offline"}">
                 ${proj.lastDuration > 0 ? "运行中" : "离线"}
             </span>
