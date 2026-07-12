@@ -22,6 +22,45 @@ function isFiniteNumber(value) {
     return typeof value === "number" && Number.isFinite(value);
 }
 
+function toNonNegativeFiniteNumber(value) {
+    return isFiniteNumber(value) && value >= 0 ? value : 0;
+}
+
+function isPlainObject(value) {
+    return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function sanitizeModelUsage(modelUsage) {
+    if (!isPlainObject(modelUsage)) {
+        return {};
+    }
+
+    return Object.fromEntries(Object.entries(modelUsage)
+        .filter(([, usage]) => isPlainObject(usage))
+        .map(([model, usage]) => [model, {
+            inputTokens: toNonNegativeFiniteNumber(usage.inputTokens),
+            outputTokens: toNonNegativeFiniteNumber(usage.outputTokens),
+            costUSD: toNonNegativeFiniteNumber(usage.costUSD),
+        }]));
+}
+
+function sanitizeBackupProject(project) {
+    const safeProject = isPlainObject(project) ? project : {};
+
+    return {
+        lastCost: toNonNegativeFiniteNumber(safeProject.lastCost),
+        lastTotalInputTokens: toNonNegativeFiniteNumber(safeProject.lastTotalInputTokens),
+        lastTotalOutputTokens: toNonNegativeFiniteNumber(safeProject.lastTotalOutputTokens),
+        lastTotalCacheReadInputTokens: toNonNegativeFiniteNumber(safeProject.lastTotalCacheReadInputTokens),
+        lastModelUsage: sanitizeModelUsage(safeProject.lastModelUsage),
+        lastAPIDuration: toNonNegativeFiniteNumber(safeProject.lastAPIDuration),
+        lastDuration: toNonNegativeFiniteNumber(safeProject.lastDuration),
+        lastSessionMetrics: isPlainObject(safeProject.lastSessionMetrics)
+            ? safeProject.lastSessionMetrics
+            : null,
+    };
+}
+
 function isValidContext(context) {
     return context === null || (
         isFiniteNumber(context?.windowSize)
@@ -125,13 +164,34 @@ class CCMonitor {
         if (this.backupWatcher) return;
 
         const backupDir = path.join(CLAUDE_HOME, "backups");
-        if (!fs.existsSync(backupDir)) return;
+        if (!fs.existsSync(backupDir)) {
+            this.backupData = {};
+            return;
+        }
 
-        this.backupWatcher = fs.watch(backupDir, (_eventType, filename) => {
-            if (filename && isBackupFile(filename)) {
-                this.readBackupFile(path.join(backupDir, filename));
-            }
-        });
+        try {
+            const watcher = fs.watch(backupDir, (_eventType, filename) => {
+                if (filename && isBackupFile(filename)) {
+                    this.readBackupFile(path.join(backupDir, filename));
+                }
+            });
+            this.backupWatcher = watcher;
+            watcher.on("error", (err) => {
+                if (this.backupWatcher !== watcher) return;
+
+                console.error("[CC] backup 监听失败:", err.message);
+                watcher.close();
+                this.backupWatcher = null;
+                this.backupData = {};
+                this.sendToRenderer();
+            });
+        } catch (err) {
+            console.error("[CC] 启动 backup 监听失败:", err.message);
+            this.backupWatcher?.close();
+            this.backupWatcher = null;
+            this.backupData = {};
+            this.sendToRenderer();
+        }
     }
 
     startSnapshotWatching() {
@@ -216,7 +276,7 @@ class CCMonitor {
         try {
             const raw = fs.readFileSync(filepath, "utf-8");
             const data = JSON.parse(raw);
-            const projects = data.projects || data;
+            const projects = isPlainObject(data?.projects) ? data.projects : data;
             // 提取我们关心的项目数据
             const projectStats = {};
 
@@ -224,23 +284,42 @@ class CCMonitor {
                 const normalized = normalizeProjectPath(projectPath);
                 const projData = projects[normalized] || projects[projectPath];
                 if (projData) {
-                    projectStats[normalized] = {
-                        lastCost: projData.lastCost || 0,
-                        lastTotalInputTokens: projData.lastTotalInputTokens || 0,
-                        lastTotalOutputTokens: projData.lastTotalOutputTokens || 0,
-                        lastTotalCacheReadInputTokens: projData.lastTotalCacheReadInputTokens || 0,
-                        lastModelUsage: projData.lastModelUsage || {},
-                        lastAPIDuration: projData.lastAPIDuration || 0,
-                        lastDuration: projData.lastDuration || 0,
-                        lastSessionMetrics: projData.lastSessionMetrics || null,
-                    };
+                    projectStats[normalized] = sanitizeBackupProject(projData);
                 }
             }
 
             this.backupData = projectStats;
             this.sendToRenderer();
+            return true;
         } catch (err) {
             console.error("[CC] 读取 backup 文件失败:", err.message);
+            return false;
+        }
+    }
+
+    refreshBackupData() {
+        const backupDir = path.join(CLAUDE_HOME, "backups");
+
+        try {
+            if (!fs.existsSync(backupDir)) {
+                this.backupData = {};
+                return;
+            }
+
+            const files = fs.readdirSync(backupDir)
+                .filter(isBackupFile)
+                .sort()
+                .reverse();
+
+            if (files.length === 0) {
+                this.backupData = {};
+                return;
+            }
+
+            this.readBackupFile(path.join(backupDir, files[0]));
+        } catch (err) {
+            console.error("[CC] 刷新 backup 数据失败:", err.message);
+            this.backupData = {};
         }
     }
 
@@ -262,17 +341,9 @@ class CCMonitor {
 
     // 立即刷新一次 backup 和快照数据
     refresh() {
-        const backupDir = path.join(CLAUDE_HOME, "backups");
-
-        if (fs.existsSync(backupDir)) {
-            const files = fs.readdirSync(backupDir)
-                .filter(isBackupFile)
-                .sort()
-                .reverse();
-
-            if (files.length > 0) {
-                this.readBackupFile(path.join(backupDir, files[0]));
-            }
+        this.refreshBackupData();
+        if (!this.backupWatcher) {
+            this.startBackupWatching();
         }
 
         if (this.snapshotWatcher) {

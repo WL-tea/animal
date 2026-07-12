@@ -271,4 +271,125 @@ try {
     fs.rmSync(eventRoot, { recursive: true, force: true });
 }
 
+const malformedBackupRoot = fs.mkdtempSync(path.join(os.tmpdir(), "animal-monitor-backup-data-"));
+const malformedBackupPath = path.join(malformedBackupRoot, "stats.json.backup.test");
+fs.writeFileSync(malformedBackupPath, JSON.stringify({
+    projects: {
+        [projectPath]: {
+            lastCost: "2.5",
+            lastTotalInputTokens: -1,
+            lastTotalOutputTokens: 20,
+            lastTotalCacheReadInputTokens: null,
+            lastAPIDuration: Number.MAX_VALUE,
+            lastDuration: {},
+            lastModelUsage: {
+                validModel: {
+                    inputTokens: 10,
+                    outputTokens: 5,
+                    costUSD: 0.25,
+                },
+                malformedModel: {
+                    inputTokens: "10",
+                    outputTokens: -5,
+                    costUSD: null,
+                },
+                missingModel: null,
+            },
+            lastSessionMetrics: [],
+        },
+    },
+}), "utf-8");
+
+const malformedBackupMonitor = new CCMonitor(null);
+malformedBackupMonitor.projects = [projectPath];
+malformedBackupMonitor.readBackupFile(malformedBackupPath);
+const sanitizedBackup = malformedBackupMonitor.backupData[projectPath];
+
+assert.strictEqual(sanitizedBackup.lastCost, 0);
+assert.strictEqual(sanitizedBackup.lastTotalInputTokens, 0);
+assert.strictEqual(sanitizedBackup.lastTotalOutputTokens, 20);
+assert.strictEqual(sanitizedBackup.lastTotalCacheReadInputTokens, 0);
+assert.strictEqual(sanitizedBackup.lastAPIDuration, Number.MAX_VALUE);
+assert.strictEqual(sanitizedBackup.lastDuration, 0);
+assert.deepStrictEqual(sanitizedBackup.lastModelUsage, {
+    validModel: {
+        inputTokens: 10,
+        outputTokens: 5,
+        costUSD: 0.25,
+    },
+    malformedModel: {
+        inputTokens: 0,
+        outputTokens: 0,
+        costUSD: 0,
+    },
+});
+assert.strictEqual(sanitizedBackup.lastSessionMetrics, null);
+fs.rmSync(malformedBackupRoot, { recursive: true, force: true });
+
+const backupRecoveryRoot = fs.mkdtempSync(path.join(os.tmpdir(), "animal-monitor-backup-recovery-"));
+const backupRecoveryUpdates = [];
+const backupRecoveryMonitor = new CCMonitor({
+    isDestroyed: () => false,
+    send: (_channel, payload) => backupRecoveryUpdates.push(payload),
+}, { snapshotDir: backupRecoveryRoot });
+backupRecoveryMonitor.projects = [projectPath];
+backupRecoveryMonitor.backupData = backupData;
+backupRecoveryMonitor.sessionSnapshots.set(`${snapshots[0].sessionId}.json`, snapshots[0]);
+backupRecoveryMonitor.snapshotAvailable = true;
+
+const originalBackupExistsSync = fs.existsSync;
+const originalBackupReaddirSync = fs.readdirSync;
+const originalBackupWatch = fs.watch;
+const originalBackupConsoleError = console.error;
+const backupConsoleErrors = [];
+const backupWatcher = new EventEmitter();
+backupWatcher.close = () => {};
+let replacementBackupWatcher = null;
+
+try {
+    console.error = (...args) => backupConsoleErrors.push(args);
+    fs.existsSync = (filepath) => filepath.endsWith(path.join(".claude", "backups"))
+        || originalBackupExistsSync(filepath);
+    fs.readdirSync = (filepath) => filepath.endsWith(path.join(".claude", "backups"))
+        ? []
+        : originalBackupReaddirSync(filepath);
+    fs.watch = () => backupWatcher;
+
+    backupRecoveryMonitor.startBackupWatching();
+    assert.strictEqual(backupRecoveryMonitor.backupWatcher, backupWatcher);
+    assert.doesNotThrow(() => backupWatcher.emit("error", new Error("backup watcher failed")));
+    assert.strictEqual(backupRecoveryMonitor.backupWatcher, null);
+    assert.deepStrictEqual(backupRecoveryMonitor.backupData, {});
+    assert.strictEqual(backupRecoveryUpdates.at(-1).projects[projectPath].sessions.length, 1);
+    assert.strictEqual(
+        backupRecoveryUpdates.at(-1).projects[projectPath].contextUsedPercentage,
+        snapshots[0].context.usedPercentage,
+    );
+    assert.strictEqual(backupConsoleErrors.length, 1);
+
+    fs.watch = () => {
+        throw new Error("backup watch unavailable");
+    };
+    assert.doesNotThrow(() => backupRecoveryMonitor.startBackupWatching());
+    assert.strictEqual(backupRecoveryMonitor.backupWatcher, null);
+    assert.strictEqual(backupConsoleErrors.length, 2);
+
+    fs.watch = () => {
+        replacementBackupWatcher = new EventEmitter();
+        replacementBackupWatcher.close = () => {};
+        return replacementBackupWatcher;
+    };
+    backupRecoveryMonitor.snapshotWatcher = { close: () => {} };
+    backupRecoveryMonitor.refresh();
+    assert.ok(replacementBackupWatcher, "refresh should install a replacement backup watcher");
+    assert.strictEqual(backupRecoveryMonitor.backupWatcher, replacementBackupWatcher);
+} finally {
+    fs.existsSync = originalBackupExistsSync;
+    fs.readdirSync = originalBackupReaddirSync;
+    fs.watch = originalBackupWatch;
+    console.error = originalBackupConsoleError;
+    backupRecoveryMonitor.stopWatching();
+    fs.rmSync(backupRecoveryRoot, { recursive: true, force: true });
+}
+
 console.log("cc monitor statusLine merge ok");
