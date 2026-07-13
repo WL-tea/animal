@@ -1,0 +1,97 @@
+/* 全局重置：背景透明，没有边距 */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html, body {
+    width: 100%;
+    height: 100%;
+    background: transparent;    /* 窗口透明关键 */
+    overflow: hidden;           /* 隐藏滚动条 */
+    user-select: none;          /* 禁止选中文字 */
+}
+
+/* ============================================
+   宠物本体 — 由 CSS 伪元素画眼睛，HTML 只留容器
+   ============================================ */
+#pet {
+    width: 120px;
+    height: 120px;
+    background: #D4784C;        /* 陶土橙 */
+    border-radius: 50%;         /* 圆形 */
+    position: absolute;
+    left: 140px;
+    top: 240px;
+    cursor: grab;
+    transition: transform 160ms ease, box-shadow 160ms ease;
+    box-shadow: inset -10px -14px 0 rgba(0, 0, 0, 0.08);
+    -webkit-app-region: no-drag;
+}
+
+#pet.is-dragging {
+    cursor: grabbing;
+    transform: scale(1.04);
+}
+
+#pet.is-walking {
+    animation: bob 480ms ease-in-out infinite alternate;
+}
+
+/* 左眼 */
+#pet::before {
+    content: "";
+    width: 16px;
+    height: 16px;
+    background: #1E1E20;
+    border-radius: 50%;
+    position: absolute;
+    top: 35px;
+    left: 30px;
+}
+
+/* 右眼 */
+#pet::after {
+    content: "";
+    width: 16px;
+    height: 16px;
+    background: #1E1E20;
+    border-radius: 50%;
+    position: absolute;
+    top: 35px;
+    right: 30px;
+}
+
+#bubble {
+    max-width: 180px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: #FFFFFF;
+    color: #1E1E20;
+    font: 14px/1.4 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    position: absolute;
+    box-shadow: 0 8px 20px rgba(30, 30, 32, 0.16);
+    pointer-events: none;
+}
+
+#bubble::after {
+    content: "";
+    width: 10px;
+    height: 10px;
+    background: #FFFFFF;
+    position: absolute;
+    left: 18px;
+    bottom: -5px;
+    transform: rotate(45deg);
+}
+
+@keyframes bob {
+    from {
+        transform: translateY(0);
+    }
+
+    to {
+        transform: translateY(-6px);
+    }
+}
