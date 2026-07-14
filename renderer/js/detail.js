@@ -132,7 +132,12 @@ function renderProjectDetail() {
 
     const proj = projectList.find((p) => p.path === selectedProject);
     if (!proj) {
-        contentEl.innerHTML = `<div class="detail-empty">选择一个项目查看状态</div>`;
+        contentEl.innerHTML = `
+            <div class="detail-empty">
+                <strong>还没有监控项目</strong>
+                <span>打开左下角“管理项目”，添加一个项目文件夹。</span>
+            </div>
+        `;
         return;
     }
 

@@ -10,3 +10,9 @@ contextBridge.exposeInMainWorld("ccAPI", {
         ipcRenderer.on("cc-update", (_event, data) => callback(data));
     },
 });
+
+contextBridge.exposeInMainWorld("settingsAPI", {
+    getProjects: () => ipcRenderer.invoke("settings:get-projects"),
+    chooseAndAddProject: () => ipcRenderer.invoke("settings:add-project"),
+    removeProject: (projectPath) => ipcRenderer.invoke("settings:remove-project", projectPath),
+});
