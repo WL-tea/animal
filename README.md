@@ -55,7 +55,7 @@ npm run check:electron
 npm test
 ```
 
-测试覆盖事件数据流、Claude Code statusLine 桥接、会话快照合并、详情上下文渲染和主进程监控生命周期。
+测试覆盖事件数据流、Claude Code statusLine 桥接、会话快照合并、详情上下文渲染、主进程监控生命周期、设置存储、安全 preload API 和设置界面交互。
 
 修改 JavaScript 后还可以单独进行语法检查：
 
@@ -92,6 +92,33 @@ Claude Code statusLine
     -> detail.js / bubble.js
 ```
 
+### 管理监控项目
+
+双击桌宠打开详情面板，再点击左下角的“管理项目”，可以添加或移除要监控的 Claude Code 项目目录。
+
+- “添加项目文件夹”会打开系统目录选择器；
+- 路径保存前会转换为规范的绝对路径并去重；
+- 项目列表保存在 Electron 的本机用户数据目录，不写入仓库；
+- 添加或移除后，监控器会立即使用新列表刷新，不需要重启应用；
+- 应用重启时会自动恢复上次保存的项目；
+- “移除”只停止监控，不会删除项目目录或其中的文件；
+- 如果已保存目录后来被移动、删除或变得不可读，设置面板会显示具体状态，由用户决定是否移除。
+
+设置数据流如下：
+
+```text
+settings.js
+    -> window.settingsAPI
+    -> preload.js
+    -> ipcRenderer.invoke(...)
+    -> ipcMain.handle(...)
+    -> settings-store.js
+    -> Electron userData/settings.json
+    -> CCMonitor.setProjects() / refresh()
+```
+
+页面不能直接访问 Node.js `fs`、Electron `dialog` 或任意 IPC channel。`preload.js` 只向页面暴露读取项目、选择并添加项目、移除项目三个受控方法。
+
 上下文达到 80% 时，桌宠会显示接近上限提醒；达到 95% 时显示危险提醒。同一区间连续更新不会重复提醒，使用率下降后再次越过阈值可以重新提醒。
 
 ### 隐私边界
@@ -104,6 +131,8 @@ Claude Code statusLine
 
 运行时快照保存在 `data/` 下并由 Git 忽略。无法确定上下文窗口或百分比时，界面会显示数据不可用，不会猜测固定的 200K 或 1M 上限。
 
+监控项目配置同样只保存在本机，但项目路径本身仍属于本机信息，不应复制进仓库文档、Issue 或公开日志。
+
 ## 当前状态
 
 当前版本已经具备：
@@ -114,7 +143,9 @@ Claude Code statusLine
 - Claude Code statusLine 会话快照监控；
 - 真实上下文窗口、百分比、Token 和费用展示；
 - 80%/95% 上下文阈值告警；
-- 多会话合并、异常数据降级和文件监听恢复。
+- 多会话合并、异常数据降级和文件监听恢复；
+- 通过设置面板添加、移除并持久化监控项目；
+- 监控路径失效提示、安全 IPC 白名单和原子配置保存。
 
 ## 版本路线
 

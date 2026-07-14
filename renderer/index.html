@@ -6,6 +6,7 @@
     <title>桌宠</title>
     <link rel="stylesheet" href="css/pet.css" />
     <link rel="stylesheet" href="css/detail.css" />
+    <link rel="stylesheet" href="css/settings.css" />
 </head>
 <body>
     <!-- 宠物本体：只有容器，外观由 CSS 决定 -->
@@ -17,6 +18,7 @@
         <div id="detail-sidebar">
             <h3>项目</h3>
             <div id="detail-list"></div>
+            <button id="settings-open" type="button">管理项目</button>
         </div>
         <div id="detail-content">
             <div class="detail-empty">正在加载数据...</div>
@@ -24,9 +26,37 @@
         <button id="detail-close">✕</button>
     </div>
 
+    <!-- 设置面板由 settings.js 独立管理 -->
+    <section id="settings-panel" aria-labelledby="settings-title" hidden>
+        <header class="settings-header">
+            <div>
+                <span class="settings-eyebrow">Monitoring</span>
+                <h2 id="settings-title">监控项目</h2>
+                <p>选择 Claude Code 项目，桌宠会持续关注它们的上下文状态。</p>
+            </div>
+            <button id="settings-close" type="button" aria-label="关闭设置">✕</button>
+        </header>
+
+        <div class="settings-body">
+            <div id="settings-status" role="status" aria-live="polite"></div>
+            <div id="settings-project-list"></div>
+            <div id="settings-empty" hidden>
+                <span class="settings-empty-mark">＋</span>
+                <strong>还没有监控项目</strong>
+                <p>添加一个项目文件夹，状态更新会自动出现在详情面板里。</p>
+            </div>
+        </div>
+
+        <footer class="settings-footer">
+            <span>项目列表会保存在本机</span>
+            <button id="settings-add-project" type="button">添加项目文件夹</button>
+        </footer>
+    </section>
+
     <script src="js/app.js"></script>
     <script src="js/bubble.js"></script>
     <script src="js/pet.js"></script>
     <script src="js/detail.js"></script>
+    <script src="js/settings.js"></script>
 </body>
 </html>
