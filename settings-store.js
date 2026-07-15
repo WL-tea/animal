@@ -1,12 +1,13 @@
 const fs = require("fs");
 const path = require("path");
 
-const SETTINGS_VERSION = 1;
+const SETTINGS_VERSION = 2;
 
 function createDefaultSettings() {
     return {
         version: SETTINGS_VERSION,
         projects: [],
+        petAlwaysOnTop: true,
     };
 }
 
@@ -47,6 +48,9 @@ function sanitizeSettings(settings) {
     return {
         version: SETTINGS_VERSION,
         projects: normalizeProjectPaths(settings.projects),
+        petAlwaysOnTop: typeof settings.petAlwaysOnTop === "boolean"
+            ? settings.petAlwaysOnTop
+            : true,
     };
 }
 

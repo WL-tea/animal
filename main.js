@@ -23,7 +23,7 @@ if (typeof electron === "string") {
     return;
 }
 
-const { app, BrowserWindow, dialog, ipcMain } = electron;
+const { app, BrowserWindow, dialog, ipcMain, screen } = electron;
 const CCMonitor = require("./cc-monitor");
 const {
     loadSettings,
@@ -32,6 +32,10 @@ const {
 } = require("./settings-store");
 
 let ccMonitor = null;
+let petWindow = null;
+let detailWindow = null;
+
+const DETAIL_WINDOW_SIZE = { width: 680, height: 520 };
 
 function getSettingsPath() {
     return path.join(app.getPath("userData"), "settings.json");
@@ -42,7 +46,11 @@ function projectPathKey(projectPath) {
 }
 
 function updateMonitoredProjects(projects) {
-    const settings = saveSettings(getSettingsPath(), { projects });
+    const currentSettings = loadSettings(getSettingsPath());
+    const settings = saveSettings(getSettingsPath(), {
+        ...currentSettings,
+        projects,
+    });
 
     if (ccMonitor) {
         ccMonitor.setProjects(settings.projects);
@@ -86,15 +94,55 @@ function projectError(code, message, projects) {
     });
 }
 
-function createWindow() {
-    // 创建一个透明、无边框、置顶的窗口
+function isWindowAvailable(window) {
+    return Boolean(window && !window.isDestroyed());
+}
+
+function sendToRendererWindows(channel, data) {
+    [petWindow, detailWindow].forEach((window) => {
+        if (isWindowAvailable(window) && !window.webContents.isDestroyed()) {
+            window.webContents.send(channel, data);
+        }
+    });
+}
+
+function createMonitorTarget() {
+    return {
+        isDestroyed: () => !isWindowAvailable(petWindow) && !isWindowAvailable(detailWindow),
+        send: sendToRendererWindows,
+    };
+}
+
+function startMonitor(settings) {
+    if (ccMonitor) return;
+
+    ccMonitor = new CCMonitor(createMonitorTarget());
+    ccMonitor.setProjects(settings.projects);
+    ccMonitor.refresh();
+}
+
+function stopMonitor() {
+    if (!ccMonitor) return;
+
+    ccMonitor.stopWatching();
+    ccMonitor = null;
+}
+
+function createPetWindow() {
+    if (isWindowAvailable(petWindow)) {
+        petWindow.show();
+        petWindow.focus();
+        return petWindow;
+    }
+
+    const settings = loadSettings(getSettingsPath());
     const win = new BrowserWindow({
         width: 400,
         height: 600,
-        transparent: true,      // 背景透明
-        frame: false,           // 无边框
-        alwaysOnTop: true,      // 永远置顶
-        resizable: false,       // 禁止用户调整大小
+        transparent: true,
+        frame: false,
+        alwaysOnTop: settings.petAlwaysOnTop,
+        resizable: false,
         hasShadow: false,
         webPreferences: {
             preload: path.join(__dirname, "preload.js"),
@@ -103,24 +151,104 @@ function createWindow() {
         },
     });
 
-    // 加载宠物页面
+    petWindow = win;
     win.loadFile(path.join(__dirname, "renderer", "index.html"));
 
-    // 用户配置保存在 Electron 的 userData 目录，不依赖仓库所在位置。
-    const settings = loadSettings(getSettingsPath());
-
-    // 启动 CC 监控（连接到这个窗口）
-    const windowMonitor = new CCMonitor(win.webContents);
-    ccMonitor = windowMonitor;
-    windowMonitor.setProjects(settings.projects);
-    windowMonitor.refresh();
-
     win.on("closed", () => {
-        windowMonitor.stopWatching();
-        if (ccMonitor === windowMonitor) {
-            ccMonitor = null;
+        if (petWindow === win) {
+            petWindow = null;
+        }
+
+        if (isWindowAvailable(detailWindow)) {
+            detailWindow.close();
+        }
+
+        stopMonitor();
+    });
+
+    startMonitor(settings);
+    return win;
+}
+
+function centeredDetailBounds() {
+    const cursor = screen.getCursorScreenPoint();
+    const { workArea } = screen.getDisplayNearestPoint(cursor);
+
+    return {
+        x: Math.round(workArea.x + (workArea.width - DETAIL_WINDOW_SIZE.width) / 2),
+        y: Math.round(workArea.y + (workArea.height - DETAIL_WINDOW_SIZE.height) / 2),
+    };
+}
+
+function ensureDetailWindowVisible() {
+    if (!isWindowAvailable(detailWindow)) return;
+
+    const bounds = detailWindow.getBounds();
+    const isRecoverable = screen.getAllDisplays().some(({ workArea }) => {
+        const overlapWidth = Math.max(0, Math.min(bounds.x + bounds.width, workArea.x + workArea.width)
+            - Math.max(bounds.x, workArea.x));
+        const overlapHeight = Math.max(0, Math.min(bounds.y + bounds.height, workArea.y + workArea.height)
+            - Math.max(bounds.y, workArea.y));
+        return overlapWidth >= 80 && overlapHeight >= 40;
+    });
+
+    if (isRecoverable) return;
+
+    const { workArea } = screen.getPrimaryDisplay();
+    detailWindow.setBounds({
+        x: Math.round(workArea.x + Math.max(0, (workArea.width - bounds.width) / 2)),
+        y: Math.round(workArea.y + Math.max(0, (workArea.height - bounds.height) / 2)),
+    });
+}
+
+function showDetailWindow() {
+    if (isWindowAvailable(detailWindow)) {
+        ensureDetailWindowVisible();
+        detailWindow.show();
+        detailWindow.focus();
+        return detailWindow;
+    }
+
+    const position = centeredDetailBounds();
+    const win = new BrowserWindow({
+        ...DETAIL_WINDOW_SIZE,
+        ...position,
+        minWidth: 560,
+        minHeight: 420,
+        show: false,
+        frame: false,
+        transparent: false,
+        backgroundColor: "#FAF8F5",
+        alwaysOnTop: false,
+        resizable: true,
+        webPreferences: {
+            preload: path.join(__dirname, "preload.js"),
+            contextIsolation: true,
+            nodeIntegration: false,
+        },
+    });
+
+    detailWindow = win;
+    win.loadFile(path.join(__dirname, "renderer", "detail-window.html"));
+    win.once("ready-to-show", () => {
+        if (!isWindowAvailable(win)) return;
+
+        ensureDetailWindowVisible();
+        win.show();
+        win.focus();
+    });
+    win.on("closed", () => {
+        if (detailWindow === win) {
+            detailWindow = null;
         }
     });
+    win.on("moved", () => {
+        if (detailWindow === win) {
+            ensureDetailWindowVisible();
+        }
+    });
+
+    return win;
 }
 
 // 页面请求刷新数据时响应
@@ -128,10 +256,56 @@ ipcMain.handle("cc-refresh", () => {
     if (ccMonitor) ccMonitor.refresh();
 });
 
+ipcMain.handle("window:open-detail", () => {
+    showDetailWindow();
+    return { ok: true };
+});
+
+ipcMain.handle("window:close-detail", () => {
+    if (isWindowAvailable(detailWindow)) {
+        detailWindow.close();
+    }
+    return { ok: true };
+});
+
 ipcMain.handle("settings:get-projects", () => projectResult({
     ok: true,
     projects: loadSettings(getSettingsPath()).projects,
 }));
+
+ipcMain.handle("settings:get-preferences", () => ({
+    ok: true,
+    petAlwaysOnTop: loadSettings(getSettingsPath()).petAlwaysOnTop,
+}));
+
+ipcMain.handle("settings:set-pet-always-on-top", (_event, enabled) => {
+    const currentSettings = loadSettings(getSettingsPath());
+    if (typeof enabled !== "boolean") {
+        return {
+            ok: false,
+            petAlwaysOnTop: currentSettings.petAlwaysOnTop,
+            error: { code: "INVALID_TOPMOST_VALUE", message: "置顶设置值无效。" },
+        };
+    }
+
+    try {
+        const settings = saveSettings(getSettingsPath(), {
+            ...currentSettings,
+            petAlwaysOnTop: enabled,
+        });
+        if (isWindowAvailable(petWindow)) {
+            petWindow.setAlwaysOnTop(settings.petAlwaysOnTop);
+        }
+        return { ok: true, petAlwaysOnTop: settings.petAlwaysOnTop };
+    } catch (error) {
+        console.error("[settings] failed to update topmost preference:", error);
+        return {
+            ok: false,
+            petAlwaysOnTop: currentSettings.petAlwaysOnTop,
+            error: { code: "SETTINGS_WRITE_FAILED", message: "置顶设置保存失败。" },
+        };
+    }
+});
 
 ipcMain.handle("settings:add-project", async () => {
     const currentProjects = loadSettings(getSettingsPath()).projects;
@@ -195,12 +369,14 @@ ipcMain.handle("settings:remove-project", async (_event, projectPath) => {
 
 // app.whenReady() 等 Electron 准备好后才创建窗口
 app.whenReady().then(() => {
-    createWindow();
+    screen.on("display-removed", ensureDetailWindowVisible);
+    screen.on("display-metrics-changed", ensureDetailWindowVisible);
+    createPetWindow();
 });
 
 app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-        createWindow();
+    if (!isWindowAvailable(petWindow)) {
+        createPetWindow();
     }
 });
 

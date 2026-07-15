@@ -53,6 +53,7 @@ const elements = {
     "#settings-open": new FakeElement(),
     "#settings-close": new FakeElement(),
     "#settings-add-project": new FakeElement(),
+    "#settings-pet-always-on-top": new FakeElement(),
 };
 elements["#settings-panel"].hidden = true;
 
@@ -97,6 +98,14 @@ const context = {
                     projectStatuses: [{ path: "E:/work/second", status: "available" }],
                 };
             },
+            getPreferences: async () => ({
+                ok: true,
+                petAlwaysOnTop: true,
+            }),
+            setPetAlwaysOnTop: async (enabled) => {
+                calls.push({ petAlwaysOnTop: enabled });
+                return { ok: true, petAlwaysOnTop: enabled };
+            },
         },
     },
 };
@@ -116,6 +125,7 @@ async function run() {
     await showPromise;
     assert.strictEqual(elements["#settings-add-project"].disabled, false);
     assert.strictEqual(elements["#settings-panel"].hidden, false);
+    assert.strictEqual(elements["#settings-pet-always-on-top"].checked, true);
     assert.strictEqual(elements["#settings-project-list"].children.length, 1);
     assert.strictEqual(elements["#settings-empty"].hidden, true);
 
@@ -149,6 +159,14 @@ async function run() {
 
     context.renderSettingsProjects([]);
     assert.strictEqual(elements["#settings-empty"].hidden, false);
+
+    elements["#settings-pet-always-on-top"].checked = false;
+    await elements["#settings-pet-always-on-top"].handlers.change();
+    assert.deepStrictEqual(calls, [
+        "E:/work/<unsafe>",
+        { petAlwaysOnTop: false },
+    ]);
+    assert.strictEqual(elements["#settings-pet-always-on-top"].checked, false);
     context.hideSettings();
     assert.strictEqual(elements["#settings-panel"].hidden, true);
 }

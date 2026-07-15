@@ -47,7 +47,7 @@ function initDetail() {
 
 function renderDetail() {
     const panel = document.querySelector("#detail-panel");
-    if (!panel || panel.hidden) return;
+    if (!panel) return;
 
     renderProjectList();
     renderProjectDetail();
@@ -135,7 +135,7 @@ function renderProjectDetail() {
         contentEl.innerHTML = `
             <div class="detail-empty">
                 <strong>还没有监控项目</strong>
-                <span>打开左下角“管理项目”，添加一个项目文件夹。</span>
+                <span>打开左下角“设置”，添加一个项目文件夹。</span>
             </div>
         `;
         return;
@@ -196,28 +196,16 @@ function renderProjectDetail() {
     `;
 }
 
-function showDetail() {
-    const panel = document.querySelector("#detail-panel");
-    if (!panel) return;
-
-    panel.hidden = false;
-    document.body.classList.add("show-detail");
-    document.querySelector("#pet")?.classList.add("with-detail");
-    renderDetail();
-}
-
-function hideDetail() {
-    const panel = document.querySelector("#detail-panel");
-    if (!panel) return;
-
-    panel.hidden = true;
-    document.body.classList.remove("show-detail");
-    document.querySelector("#pet")?.classList.remove("with-detail");
+function closeDetailWindow() {
+    const result = window.windowAPI?.closeDetail();
+    if (result?.catch) {
+        result.catch((error) => {
+            console.error("[window] failed to close detail window:", error);
+        });
+    }
 }
 
 document.addEventListener("DOMContentLoaded", () => {
     initDetail();
-
-    window.petApp?.on("detail:open", showDetail);
-    document.querySelector("#detail-close")?.addEventListener("click", hideDetail);
+    document.querySelector("#detail-close")?.addEventListener("click", closeDetailWindow);
 });
