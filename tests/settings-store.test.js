@@ -28,10 +28,25 @@ try {
         null,
     ]), [path.resolve(firstProject), path.resolve(secondProject)]);
 
-    assert.deepStrictEqual(sanitizeSettings(null), { version: 1, projects: [] });
-    assert.deepStrictEqual(sanitizeSettings({ projects: "not-an-array" }), {
-        version: 1,
+    assert.deepStrictEqual(sanitizeSettings(null), {
+        version: 2,
         projects: [],
+        petAlwaysOnTop: true,
+    });
+    assert.deepStrictEqual(sanitizeSettings({ projects: "not-an-array" }), {
+        version: 2,
+        projects: [],
+        petAlwaysOnTop: true,
+    });
+
+    assert.deepStrictEqual(sanitizeSettings({
+        version: 1,
+        projects: [firstProject],
+        petAlwaysOnTop: false,
+    }), {
+        version: 2,
+        projects: [path.resolve(firstProject)],
+        petAlwaysOnTop: false,
     });
 
     const savedSettings = saveSettings(settingsPath, {
@@ -41,16 +56,19 @@ try {
     });
 
     assert.deepStrictEqual(savedSettings, {
-        version: 1,
+        version: 2,
         projects: [path.resolve(firstProject), path.resolve(secondProject)],
+        petAlwaysOnTop: true,
     });
     assert.deepStrictEqual(loadSettings(settingsPath), savedSettings);
 
     const replacedSettings = saveSettings(settingsPath, {
         projects: [secondProject],
+        petAlwaysOnTop: false,
     });
     assert.deepStrictEqual(loadSettings(settingsPath), replacedSettings);
     assert.deepStrictEqual(replacedSettings.projects, [path.resolve(secondProject)]);
+    assert.strictEqual(replacedSettings.petAlwaysOnTop, false);
 
     assert.deepStrictEqual(
         fs.readdirSync(path.dirname(settingsPath)),
@@ -63,7 +81,11 @@ try {
     const loggedErrors = [];
     try {
         console.error = (...args) => loggedErrors.push(args);
-        assert.deepStrictEqual(loadSettings(settingsPath), { version: 1, projects: [] });
+        assert.deepStrictEqual(loadSettings(settingsPath), {
+            version: 2,
+            projects: [],
+            petAlwaysOnTop: true,
+        });
     } finally {
         console.error = originalConsoleError;
     }
@@ -71,7 +93,11 @@ try {
     assert.match(loggedErrors[0][0], /failed to read settings/);
 
     fs.rmSync(settingsPath);
-    assert.deepStrictEqual(loadSettings(settingsPath), { version: 1, projects: [] });
+    assert.deepStrictEqual(loadSettings(settingsPath), {
+        version: 2,
+        projects: [],
+        petAlwaysOnTop: true,
+    });
 } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
 }

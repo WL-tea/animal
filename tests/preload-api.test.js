@@ -31,21 +31,35 @@ try {
 
     require("../preload");
 
-    assert.deepStrictEqual(Object.keys(exposedAPIs).sort(), ["ccAPI", "settingsAPI"]);
+    assert.deepStrictEqual(Object.keys(exposedAPIs).sort(), ["ccAPI", "settingsAPI", "windowAPI"]);
     assert.deepStrictEqual(Object.keys(exposedAPIs.settingsAPI).sort(), [
         "chooseAndAddProject",
+        "getPreferences",
         "getProjects",
         "removeProject",
+        "setPetAlwaysOnTop",
+    ]);
+    assert.deepStrictEqual(Object.keys(exposedAPIs.windowAPI).sort(), [
+        "closeDetail",
+        "openDetail",
     ]);
 
     exposedAPIs.settingsAPI.getProjects();
     exposedAPIs.settingsAPI.chooseAndAddProject();
     exposedAPIs.settingsAPI.removeProject("E:/project");
+    exposedAPIs.settingsAPI.getPreferences();
+    exposedAPIs.settingsAPI.setPetAlwaysOnTop(false);
+    exposedAPIs.windowAPI.openDetail();
+    exposedAPIs.windowAPI.closeDetail();
 
     assert.deepStrictEqual(invocations, [
         { channel: "settings:get-projects", args: [] },
         { channel: "settings:add-project", args: [] },
         { channel: "settings:remove-project", args: ["E:/project"] },
+        { channel: "settings:get-preferences", args: [] },
+        { channel: "settings:set-pet-always-on-top", args: [false] },
+        { channel: "window:open-detail", args: [] },
+        { channel: "window:close-detail", args: [] },
     ]);
 
     let receivedUpdate = null;

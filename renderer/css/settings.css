@@ -75,6 +75,59 @@
     overflow-y: auto;
 }
 
+.settings-group + .settings-group {
+    margin-top: 20px;
+}
+
+.settings-group > h3 {
+    margin: 0 0 9px;
+    color: var(--settings-muted);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+}
+
+.settings-toggle-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    padding: 13px 14px;
+    border: 1px solid var(--settings-line);
+    border-radius: 9px;
+    background: var(--settings-card);
+    cursor: pointer;
+}
+
+.settings-toggle-card strong,
+.settings-toggle-card small {
+    display: block;
+}
+
+.settings-toggle-card strong {
+    margin-bottom: 4px;
+    font-size: 13px;
+}
+
+.settings-toggle-card small {
+    color: var(--settings-muted);
+    font-size: 10px;
+    line-height: 1.45;
+}
+
+.settings-toggle-card input {
+    width: 17px;
+    height: 17px;
+    flex-shrink: 0;
+    accent-color: var(--settings-accent);
+}
+
+.settings-toggle-card:has(input:focus-visible) {
+    outline: 2px solid var(--settings-accent);
+    outline-offset: 2px;
+}
+
 #settings-status {
     min-height: 18px;
     margin-bottom: 8px;

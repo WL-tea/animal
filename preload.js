@@ -15,4 +15,11 @@ contextBridge.exposeInMainWorld("settingsAPI", {
     getProjects: () => ipcRenderer.invoke("settings:get-projects"),
     chooseAndAddProject: () => ipcRenderer.invoke("settings:add-project"),
     removeProject: (projectPath) => ipcRenderer.invoke("settings:remove-project", projectPath),
+    getPreferences: () => ipcRenderer.invoke("settings:get-preferences"),
+    setPetAlwaysOnTop: (enabled) => ipcRenderer.invoke("settings:set-pet-always-on-top", enabled),
+});
+
+contextBridge.exposeInMainWorld("windowAPI", {
+    openDetail: () => ipcRenderer.invoke("window:open-detail"),
+    closeDetail: () => ipcRenderer.invoke("window:close-detail"),
 });

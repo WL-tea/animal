@@ -1,4 +1,17 @@
-/* 详情窗口 — 侧栏 + 主区域布局 */
+/* 独立详情窗口 — 顶部拖动栏 + 侧栏 + 主区域布局 */
+
+* {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+    background: #FAF8F5;
+}
 
 #detail-panel {
     position: fixed;
@@ -8,13 +21,45 @@
     bottom: 0;
     background: #FAF8F5;
     display: flex;
+    flex-direction: column;
     z-index: 100;
     color: #1E1E20;
     font-family: system-ui, -apple-system, sans-serif;
 }
 
-#detail-panel[hidden] {
-    display: none;
+#detail-titlebar {
+    min-height: 44px;
+    padding: 8px 10px 8px 16px;
+    border-bottom: 1px solid #E0DCD5;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #F7F3EE;
+    app-region: drag;
+    -webkit-app-region: drag;
+    user-select: none;
+}
+
+#detail-titlebar strong,
+#detail-titlebar span {
+    display: block;
+}
+
+#detail-titlebar strong {
+    font-size: 13px;
+    color: #2C2C30;
+}
+
+#detail-titlebar span {
+    margin-top: 2px;
+    color: #8A8580;
+    font-size: 10px;
+}
+
+#detail-window-body {
+    display: flex;
+    flex: 1;
+    min-height: 0;
 }
 
 /* 左侧项目列表 */
@@ -267,9 +312,7 @@
 
 /* 关闭按钮 */
 #detail-close {
-    position: fixed;
-    top: 12px;
-    right: 12px;
+    position: static;
     width: 28px;
     height: 28px;
     border: none;
@@ -282,6 +325,8 @@
     justify-content: center;
     color: #787880;
     z-index: 101;
+    app-region: no-drag;
+    -webkit-app-region: no-drag;
 }
 
 #detail-close:hover {

@@ -104,6 +104,23 @@ async function loadSettingsProjects() {
     }
 }
 
+async function loadPreferences() {
+    const topmostToggle = document.querySelector("#settings-pet-always-on-top");
+    if (!topmostToggle || !window.settingsAPI?.getPreferences) return;
+
+    try {
+        const result = await window.settingsAPI.getPreferences();
+        topmostToggle.checked = result?.petAlwaysOnTop !== false;
+        if (!result?.ok) {
+            setSettingsStatus(result?.error?.message || "窗口设置读取失败。", true);
+        }
+    } catch (error) {
+        console.error("[settings] failed to load preferences:", error);
+        topmostToggle.checked = true;
+        setSettingsStatus("窗口设置读取失败，请稍后重试。", true);
+    }
+}
+
 async function addProject() {
     if (settingsState.busy || !window.settingsAPI) return;
 
@@ -155,7 +172,7 @@ async function showSettings() {
     if (!panel) return;
 
     panel.hidden = false;
-    await loadSettingsProjects();
+    await Promise.all([loadSettingsProjects(), loadPreferences()]);
 }
 
 function hideSettings() {
@@ -163,8 +180,35 @@ function hideSettings() {
     if (panel) panel.hidden = true;
 }
 
+async function updatePetAlwaysOnTop() {
+    const topmostToggle = document.querySelector("#settings-pet-always-on-top");
+    if (!topmostToggle || !window.settingsAPI?.setPetAlwaysOnTop) return;
+
+    const requestedValue = topmostToggle.checked;
+    topmostToggle.disabled = true;
+    setSettingsStatus("正在更新窗口设置…");
+    try {
+        const result = await window.settingsAPI.setPetAlwaysOnTop(requestedValue);
+        topmostToggle.checked = result?.petAlwaysOnTop !== false;
+        setSettingsStatus(
+            result?.ok ? "窗口设置已更新。" : result?.error?.message || "窗口设置更新失败。",
+            !result?.ok,
+        );
+    } catch (error) {
+        console.error("[settings] failed to update topmost preference:", error);
+        topmostToggle.checked = !requestedValue;
+        setSettingsStatus("窗口设置更新失败，请稍后重试。", true);
+    } finally {
+        topmostToggle.disabled = false;
+    }
+}
+
 document.addEventListener("DOMContentLoaded", () => {
     document.querySelector("#settings-open")?.addEventListener("click", showSettings);
     document.querySelector("#settings-close")?.addEventListener("click", hideSettings);
     document.querySelector("#settings-add-project")?.addEventListener("click", addProject);
+    document.querySelector("#settings-pet-always-on-top")?.addEventListener(
+        "change",
+        updatePetAlwaysOnTop,
+    );
 });

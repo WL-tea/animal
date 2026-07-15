@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>桌宠状态</title>
+    <link rel="stylesheet" href="css/detail.css" />
+    <link rel="stylesheet" href="css/settings.css" />
+</head>
+<body>
+    <main id="detail-panel">
+        <header id="detail-titlebar">
+            <div>
+                <strong>桌宠状态</strong>
+                <span>拖动这里可以移动窗口</span>
+            </div>
+            <button id="detail-close" type="button" aria-label="关闭详情窗口">✕</button>
+        </header>
+
+        <div id="detail-window-body">
+            <aside id="detail-sidebar">
+                <h3>项目</h3>
+                <div id="detail-list"></div>
+                <button id="settings-open" type="button">设置</button>
+            </aside>
+            <section id="detail-content">
+                <div class="detail-empty">正在加载数据...</div>
+            </section>
+        </div>
+    </main>
+
+    <section id="settings-panel" aria-labelledby="settings-title" hidden>
+        <header class="settings-header">
+            <div>
+                <span class="settings-eyebrow">Preferences</span>
+                <h2 id="settings-title">桌宠设置</h2>
+                <p>调整窗口行为，并选择需要持续监控的 Claude Code 项目。</p>
+            </div>
+            <button id="settings-close" type="button" aria-label="关闭设置">✕</button>
+        </header>
+
+        <div class="settings-body">
+            <div id="settings-status" role="status" aria-live="polite"></div>
+
+            <section class="settings-group" aria-labelledby="settings-window-title">
+                <h3 id="settings-window-title">窗口行为</h3>
+                <label class="settings-toggle-card" for="settings-pet-always-on-top">
+                    <span>
+                        <strong>桌宠始终置顶</strong>
+                        <small>关闭后，其他应用窗口可以覆盖桌宠。</small>
+                    </span>
+                    <input id="settings-pet-always-on-top" type="checkbox" />
+                </label>
+            </section>
+
+            <section class="settings-group" aria-labelledby="settings-projects-title">
+                <h3 id="settings-projects-title">监控项目</h3>
+                <div id="settings-project-list"></div>
+                <div id="settings-empty" hidden>
+                    <span class="settings-empty-mark">＋</span>
+                    <strong>还没有监控项目</strong>
+                    <p>添加一个项目文件夹，状态更新会自动出现在详情界面里。</p>
+                </div>
+            </section>
+        </div>
+
+        <footer class="settings-footer">
+            <span>设置只保存在本机</span>
+            <button id="settings-add-project" type="button">添加项目文件夹</button>
+        </footer>
+    </section>
+
+    <script src="js/app.js"></script>
+    <script src="js/detail.js"></script>
+    <script src="js/settings.js"></script>
+</body>
+</html>

@@ -27,6 +27,7 @@ html, body {
     cursor: grab;
     transition: transform 160ms ease, box-shadow 160ms ease;
     box-shadow: inset -10px -14px 0 rgba(0, 0, 0, 0.08);
+    app-region: no-drag;
     -webkit-app-region: no-drag;
 }
 

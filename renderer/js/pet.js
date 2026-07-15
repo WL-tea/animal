@@ -86,10 +86,11 @@ pet.addEventListener("pointerup", (event) => {
 });
 
 pet.addEventListener("dblclick", () => {
-    if (window.petApp) {
-        window.petApp.emit("detail:open");
-    } else {
-        console.log("详情窗口加载中...");
+    const result = window.windowAPI?.openDetail();
+    if (result?.catch) {
+        result.catch((error) => {
+            console.error("[window] failed to open detail window:", error);
+        });
     }
 });
 
