@@ -23,7 +23,16 @@ if (typeof electron === "string") {
     return;
 }
 
-const { app, BrowserWindow, dialog, ipcMain, screen } = electron;
+const {
+    app,
+    BrowserWindow,
+    dialog,
+    ipcMain,
+    Menu,
+    nativeImage,
+    screen,
+    Tray,
+} = electron;
 const CCMonitor = require("./cc-monitor");
 const {
     loadSettings,
@@ -34,6 +43,8 @@ const {
 let ccMonitor = null;
 let petWindow = null;
 let detailWindow = null;
+let tray = null;
+let isQuitting = false;
 
 const DETAIL_WINDOW_SIZE = { width: 680, height: 520 };
 
@@ -108,7 +119,7 @@ function sendToRendererWindows(channel, data) {
 
 function createMonitorTarget() {
     return {
-        isDestroyed: () => !isWindowAvailable(petWindow) && !isWindowAvailable(detailWindow),
+        isDestroyed: () => isQuitting,
         send: sendToRendererWindows,
     };
 }
@@ -128,6 +139,81 @@ function stopMonitor() {
     ccMonitor = null;
 }
 
+function showPetWindow() {
+    const win = createPetWindow();
+    win.show();
+    win.focus();
+    refreshTrayMenu();
+    return win;
+}
+
+function togglePetVisibility() {
+    if (isWindowAvailable(petWindow) && petWindow.isVisible()) {
+        petWindow.hide();
+        refreshTrayMenu();
+        return;
+    }
+
+    showPetWindow();
+}
+
+function buildTrayMenu() {
+    const settings = loadSettings(getSettingsPath());
+    const petIsVisible = isWindowAvailable(petWindow) && petWindow.isVisible();
+
+    return Menu.buildFromTemplate([
+        {
+            id: "toggle-pet",
+            label: petIsVisible ? "隐藏桌宠" : "显示桌宠",
+            click: togglePetVisibility,
+        },
+        {
+            id: "open-detail",
+            label: "打开详情",
+            click: () => showDetailWindow(),
+        },
+        {
+            id: "open-settings",
+            label: "打开设置",
+            click: () => showDetailWindow({ openSettings: true }),
+        },
+        { type: "separator" },
+        {
+            id: "pet-always-on-top",
+            label: "桌宠始终置顶",
+            type: "checkbox",
+            checked: settings.petAlwaysOnTop,
+            click: (menuItem) => updatePetAlwaysOnTop(menuItem.checked),
+        },
+        { type: "separator" },
+        {
+            id: "quit",
+            label: "退出应用",
+            click: () => app.quit(),
+        },
+    ]);
+}
+
+function refreshTrayMenu() {
+    if (!tray) return;
+    tray.setContextMenu(buildTrayMenu());
+}
+
+function createTray() {
+    if (tray) return tray;
+
+    const iconPath = path.join(__dirname, "assets", "tray", "tray-icon-32.png");
+    const trayImage = fs.existsSync(iconPath) ? iconPath : nativeImage.createEmpty();
+    if (trayImage !== iconPath) {
+        console.error(`[tray] icon not found: ${iconPath}`);
+    }
+
+    tray = new Tray(trayImage);
+    tray.setToolTip("桌宠");
+    refreshTrayMenu();
+    return tray;
+}
+
 function createPetWindow() {
     if (isWindowAvailable(petWindow)) {
         petWindow.show();
@@ -144,6 +230,7 @@ function createPetWindow() {
         alwaysOnTop: settings.petAlwaysOnTop,
         resizable: false,
         hasShadow: false,
+        skipTaskbar: true,
         webPreferences: {
             preload: path.join(__dirname, "preload.js"),
             contextIsolation: true,
@@ -159,14 +246,10 @@ function createPetWindow() {
             petWindow = null;
         }
 
-        if (isWindowAvailable(detailWindow)) {
-            detailWindow.close();
+        if (!isQuitting) {
+            app.quit();
         }
-
-        stopMonitor();
     });
-
-    startMonitor(settings);
     return win;
 }
 
@@ -201,11 +284,18 @@ function ensureDetailWindowVisible() {
     });
 }
 
-function showDetailWindow() {
+function openSettingsInWindow(win) {
+    if (isWindowAvailable(win) && !win.webContents.isDestroyed()) {
+        win.webContents.send("settings:open");
+    }
+}
+
+function showDetailWindow({ openSettings = false } = {}) {
     if (isWindowAvailable(detailWindow)) {
         ensureDetailWindowVisible();
         detailWindow.show();
         detailWindow.focus();
+        if (openSettings) openSettingsInWindow(detailWindow);
         return detailWindow;
     }
 
@@ -221,6 +311,7 @@ function showDetailWindow() {
         backgroundColor: "#FAF8F5",
         alwaysOnTop: false,
         resizable: true,
+        skipTaskbar: false,
         webPreferences: {
             preload: path.join(__dirname, "preload.js"),
             contextIsolation: true,
@@ -236,6 +327,7 @@ function showDetailWindow() {
         ensureDetailWindowVisible();
         win.show();
         win.focus();
+        if (openSettings) openSettingsInWindow(win);
     });
     win.on("closed", () => {
         if (detailWindow === win) {
@@ -278,7 +370,7 @@ ipcMain.handle("settings:get-preferences", () => ({
     petAlwaysOnTop: loadSettings(getSettingsPath()).petAlwaysOnTop,
 }));
 
-ipcMain.handle("settings:set-pet-always-on-top", (_event, enabled) => {
+function updatePetAlwaysOnTop(enabled) {
     const currentSettings = loadSettings(getSettingsPath());
     if (typeof enabled !== "boolean") {
         return {
@@ -296,6 +388,7 @@ ipcMain.handle("settings:set-pet-always-on-top", (_event, enabled) => {
         if (isWindowAvailable(petWindow)) {
             petWindow.setAlwaysOnTop(settings.petAlwaysOnTop);
         }
+        refreshTrayMenu();
         return { ok: true, petAlwaysOnTop: settings.petAlwaysOnTop };
     } catch (error) {
         console.error("[settings] failed to update topmost preference:", error);
@@ -305,7 +398,11 @@ ipcMain.handle("settings:set-pet-always-on-top", (_event, enabled) => {
             error: { code: "SETTINGS_WRITE_FAILED", message: "置顶设置保存失败。" },
         };
     }
-});
+}
+
+ipcMain.handle("settings:set-pet-always-on-top", (_event, enabled) => (
+    updatePetAlwaysOnTop(enabled)
+));
 
 ipcMain.handle("settings:add-project", async () => {
     const currentProjects = loadSettings(getSettingsPath()).projects;
@@ -372,16 +469,25 @@ app.whenReady().then(() => {
     screen.on("display-removed", ensureDetailWindowVisible);
     screen.on("display-metrics-changed", ensureDetailWindowVisible);
     createPetWindow();
+    createTray();
+    startMonitor(loadSettings(getSettingsPath()));
 });
 
 app.on("activate", () => {
-    if (!isWindowAvailable(petWindow)) {
-        createPetWindow();
+    showPetWindow();
+});
+
+app.on("before-quit", () => {
+    isQuitting = true;
+    stopMonitor();
+});
+
+app.on("will-quit", () => {
+    if (tray) {
+        tray.destroy();
+        tray = null;
     }
 });
 
-app.on("window-all-closed", () => {
-    if (process.platform !== "darwin") {
-        app.quit();
-    }
-});
+// 托盘是应用常驻入口；所有窗口关闭后仍保持后台监控。
+app.on("window-all-closed", () => {});

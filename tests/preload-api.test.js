@@ -41,6 +41,7 @@ try {
     ]);
     assert.deepStrictEqual(Object.keys(exposedAPIs.windowAPI).sort(), [
         "closeDetail",
+        "onOpenSettings",
         "openDetail",
     ]);
 
@@ -68,6 +69,13 @@ try {
     });
     listeners["cc-update"](null, { projects: {} });
     assert.deepStrictEqual(receivedUpdate, { projects: {} });
+
+    let settingsOpenCount = 0;
+    exposedAPIs.windowAPI.onOpenSettings(() => {
+        settingsOpenCount += 1;
+    });
+    listeners["settings:open"]();
+    assert.strictEqual(settingsOpenCount, 1);
 } finally {
     Module._load = originalLoad;
 }

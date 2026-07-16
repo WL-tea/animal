@@ -21,6 +21,8 @@ const screenHandlers = {};
 let readyHandler = null;
 const windows = [];
 const monitors = [];
+const trays = [];
+let quitCount = 0;
 let dialogResult = {
     canceled: false,
     filePaths: [addedProject],
@@ -32,7 +34,9 @@ class FakeBrowserWindow {
         this.handlers = {};
         this.loadedFile = null;
         this.destroyed = false;
+        this.visible = options.show !== false;
         this.showCount = 0;
+        this.hideCount = 0;
         this.focusCount = 0;
         this.alwaysOnTopValues = [];
         this.bounds = { x: 100, y: 100, width: options.width, height: options.height };
@@ -57,7 +61,13 @@ class FakeBrowserWindow {
     }
 
     show() {
+        this.visible = true;
         this.showCount += 1;
+    }
+
+    hide() {
+        this.visible = false;
+        this.hideCount += 1;
     }
 
     focus() {
@@ -66,12 +76,25 @@ class FakeBrowserWindow {
 
     close() {
         if (this.destroyed) return;
+        let prevented = false;
+        this.handlers.close?.({ preventDefault: () => { prevented = true; } });
+        if (prevented) return;
+        this.destroy();
+    }
+
+    destroy() {
+        if (this.destroyed) return;
         this.destroyed = true;
+        this.visible = false;
         this.handlers.closed?.();
     }
 
     isDestroyed() {
         return this.destroyed;
+    }
+
+    isVisible() {
+        return this.visible;
     }
 
     setAlwaysOnTop(enabled) {
@@ -88,6 +111,39 @@ class FakeBrowserWindow {
 }
 
 FakeBrowserWindow.getAllWindows = () => windows.filter((window) => !window.destroyed);
+
+class FakeTray {
+    constructor(image) {
+        this.image = image;
+        this.destroyed = false;
+        this.tooltip = "";
+        this.contextMenu = null;
+        trays.push(this);
+    }
+
+    setToolTip(tooltip) {
+        this.tooltip = tooltip;
+    }
+
+    setContextMenu(menu) {
+        this.contextMenu = menu;
+    }
+
+    destroy() {
+        this.destroyed = true;
+    }
+}
+
+const FakeMenu = {
+    buildFromTemplate(template) {
+        return {
+            items: template,
+            getMenuItemById(id) {
+                return template.find((item) => item.id === id);
+            },
+        };
+    },
+};
 
 class FakeMonitor {
     constructor(target) {
@@ -120,13 +176,19 @@ const fakeElectron = {
             return tempRoot;
         },
         on: (eventName, handler) => { appHandlers[eventName] = handler; },
-        quit() {},
+        quit() {
+            quitCount += 1;
+            appHandlers["before-quit"]?.();
+            FakeBrowserWindow.getAllWindows().forEach((window) => window.close());
+            appHandlers["will-quit"]?.();
+        },
     },
     BrowserWindow: FakeBrowserWindow,
     dialog: {
         showOpenDialog: async () => dialogResult,
     },
     ipcMain: { handle: (channel, handler) => { ipcHandlers[channel] = handler; } },
+    Menu: FakeMenu,
     screen: {
         getAllDisplays: () => [{ workArea: primaryWorkArea }],
         getPrimaryDisplay: () => ({ workArea: primaryWorkArea }),
@@ -134,6 +196,7 @@ const fakeElectron = {
         getCursorScreenPoint: () => ({ x: 400, y: 300 }),
         on: (eventName, handler) => { screenHandlers[eventName] = handler; },
     },
+    Tray: FakeTray,
 };
 
 const originalLoad = Module._load;
@@ -150,13 +213,40 @@ async function run() {
 
         assert.strictEqual(windows.length, 1, "startup should create only the pet window");
         assert.strictEqual(monitors.length, 1, "the app should own one shared monitor");
+        assert.strictEqual(trays.length, 1, "startup should create one tray icon");
         const petWindow = windows[0];
+        const tray = trays[0];
         assert.match(petWindow.loadedFile, /renderer[\\/]index\.html$/);
         assert.strictEqual(petWindow.options.alwaysOnTop, true);
+        assert.strictEqual(petWindow.options.skipTaskbar, true);
+        assert.match(tray.image, /assets[\\/]tray[\\/]tray-icon-32\.png$/);
+        assert.strictEqual(tray.tooltip, "桌宠");
+        assert.deepStrictEqual(
+            tray.contextMenu.items.map((item) => item.type === "separator" ? "separator" : item.id),
+            ["toggle-pet", "open-detail", "open-settings", "separator", "pet-always-on-top", "separator", "quit"],
+        );
+        assert.strictEqual(tray.contextMenu.getMenuItemById("toggle-pet").label, "隐藏桌宠");
+        assert.strictEqual(tray.contextMenu.getMenuItemById("pet-always-on-top").checked, true);
+        const originalQuit = fakeElectron.app.quit;
+        fakeElectron.app.quit = () => { quitCount += 1; };
+        tray.contextMenu.getMenuItemById("quit").click();
+        assert.strictEqual(quitCount, 1, "the quit menu command should request app exit");
+        quitCount = 0;
+        fakeElectron.app.quit = originalQuit;
         assert.deepStrictEqual(monitors[0].projects, [
             path.resolve(configuredProject),
             path.resolve(missingProject),
         ]);
+
+        tray.contextMenu.getMenuItemById("toggle-pet").click();
+        assert.strictEqual(petWindow.isVisible(), false);
+        assert.strictEqual(petWindow.hideCount, 1);
+        assert.strictEqual(monitors[0].stopCount, 0, "hiding the pet must keep monitoring alive");
+        assert.strictEqual(tray.contextMenu.getMenuItemById("toggle-pet").label, "显示桌宠");
+
+        tray.contextMenu.getMenuItemById("toggle-pet").click();
+        assert.strictEqual(petWindow.isVisible(), true);
+        assert.strictEqual(tray.contextMenu.getMenuItemById("toggle-pet").label, "隐藏桌宠");
 
         appHandlers.activate();
         assert.strictEqual(windows.length, 1, "activate should reuse the existing pet window");
@@ -166,18 +256,29 @@ async function run() {
         const detailWindow = windows[1];
         assert.match(detailWindow.loadedFile, /renderer[\\/]detail-window\.html$/);
         assert.strictEqual(detailWindow.options.alwaysOnTop, false);
+        assert.strictEqual(detailWindow.options.skipTaskbar, false);
         detailWindow.handlers["ready-to-show"]();
         assert.strictEqual(detailWindow.showCount, 1);
         assert.strictEqual(detailWindow.focusCount, 1);
 
+        tray.contextMenu.getMenuItemById("open-settings").click();
+        assert.strictEqual(windows.length, 2, "opening settings should reuse the detail window");
+        assert.deepStrictEqual(detailWindow.webContents.sent.at(-1), {
+            channel: "settings:open",
+            data: undefined,
+        });
+
         ipcHandlers["window:open-detail"]();
         assert.strictEqual(windows.length, 2, "opening details again should reuse the window");
-        assert.strictEqual(detailWindow.showCount, 2);
-        assert.strictEqual(detailWindow.focusCount, 2);
+        assert.strictEqual(detailWindow.showCount, 3);
+        assert.strictEqual(detailWindow.focusCount, 3);
 
         monitors[0].target.send("cc-update", { projects: {} });
         assert.strictEqual(petWindow.webContents.sent.length, 1);
-        assert.strictEqual(detailWindow.webContents.sent.length, 1);
+        assert.strictEqual(
+            detailWindow.webContents.sent.filter(({ channel }) => channel === "cc-update").length,
+            1,
+        );
 
         ipcHandlers["window:close-detail"]();
         assert.strictEqual(detailWindow.destroyed, true);
@@ -188,6 +289,7 @@ async function run() {
         const topmostResult = await ipcHandlers["settings:set-pet-always-on-top"](null, false);
         assert.deepStrictEqual(topmostResult, { ok: true, petAlwaysOnTop: false });
         assert.deepStrictEqual(petWindow.alwaysOnTopValues, [false]);
+        assert.strictEqual(tray.contextMenu.getMenuItemById("pet-always-on-top").checked, false);
 
         ipcHandlers["window:open-detail"]();
         const reopenedDetailWindow = windows[2];
@@ -252,11 +354,11 @@ async function run() {
         assert.strictEqual(canceledResult.canceled, true);
 
         petWindow.close();
-        assert.strictEqual(monitors[0].stopCount, 1);
+        assert.strictEqual(petWindow.destroyed, true, "closing the pet should exit the app");
+        assert.strictEqual(quitCount, 1);
+        assert.strictEqual(monitors[0].stopCount, 1, "only quitting should stop monitoring");
+        assert.strictEqual(tray.destroyed, true);
         assert.strictEqual(reopenedDetailWindow.destroyed, true);
-
-        appHandlers.activate();
-        assert.strictEqual(monitors.length, 2, "reactivation should create a fresh monitor");
     } finally {
         Module._load = originalLoad;
         fs.rmSync(tempRoot, { recursive: true, force: true });
