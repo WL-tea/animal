@@ -33,6 +33,14 @@ const {
     screen,
     Tray,
 } = electron;
+
+// 只允许一个应用实例拥有托盘、窗口和监控器。
+// 第二次启动会通知主实例，然后在创建任何应用资源前退出。
+if (!app.requestSingleInstanceLock()) {
+    app.quit();
+    return;
+}
+
 const CCMonitor = require("./cc-monitor");
 const {
     loadSettings,
@@ -498,6 +506,10 @@ app.whenReady().then(() => {
 });
 
 app.on("activate", () => {
+    showPetWindow();
+});
+
+app.on("second-instance", () => {
     showPetWindow();
 });
 

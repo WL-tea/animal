@@ -23,6 +23,8 @@ const windows = [];
 const monitors = [];
 const trays = [];
 let quitCount = 0;
+let singleInstanceLockGranted = true;
+let singleInstanceLockRequestCount = 0;
 let dialogResult = {
     canceled: false,
     filePaths: [addedProject],
@@ -195,6 +197,10 @@ class FakeMonitor {
 const primaryWorkArea = { x: 0, y: 0, width: 1920, height: 1080 };
 const fakeElectron = {
     app: {
+        requestSingleInstanceLock() {
+            singleInstanceLockRequestCount += 1;
+            return singleInstanceLockGranted;
+        },
         whenReady: () => ({ then: (handler) => { readyHandler = handler; } }),
         getPath: (name) => {
             assert.strictEqual(name, "userData");
@@ -236,6 +242,7 @@ async function run() {
         require("../main");
         readyHandler();
 
+        assert.strictEqual(singleInstanceLockRequestCount, 1, "startup should request one instance lock");
         assert.strictEqual(windows.length, 1, "startup should create only the pet window");
         assert.strictEqual(monitors.length, 1, "the app should own one shared monitor");
         assert.strictEqual(trays.length, 1, "startup should create one tray icon");
@@ -296,6 +303,13 @@ async function run() {
 
         appHandlers.activate();
         assert.strictEqual(windows.length, 1, "activate should reuse the existing pet window");
+
+        petWindow.hide();
+        appHandlers["second-instance"]();
+        assert.strictEqual(petWindow.isVisible(), true, "a second launch should reveal the primary pet");
+        assert.strictEqual(windows.length, 1, "a second launch must reuse the primary window");
+        assert.strictEqual(trays.length, 1, "a second launch must not create another tray");
+        assert.strictEqual(monitors.length, 1, "a second launch must not create another monitor");
 
         ipcHandlers["window:open-detail"]();
         assert.strictEqual(windows.length, 2);
@@ -405,6 +419,32 @@ async function run() {
         assert.strictEqual(monitors[0].stopCount, 1, "only quitting should stop monitoring");
         assert.strictEqual(tray.destroyed, true);
         assert.strictEqual(reopenedDetailWindow.destroyed, true);
+
+        const mainModulePath = require.resolve("../main");
+        const readyHandlerBeforeSecondProcess = readyHandler;
+        const resourceCountsBeforeSecondProcess = {
+            windows: windows.length,
+            trays: trays.length,
+            monitors: monitors.length,
+        };
+        let secondaryQuitCount = 0;
+        singleInstanceLockGranted = false;
+        fakeElectron.app.quit = () => { secondaryQuitCount += 1; };
+        delete require.cache[mainModulePath];
+        require("../main");
+
+        assert.strictEqual(singleInstanceLockRequestCount, 2);
+        assert.strictEqual(secondaryQuitCount, 1, "a secondary process should quit immediately");
+        assert.strictEqual(readyHandler, readyHandlerBeforeSecondProcess, "a secondary process must not register startup");
+        assert.deepStrictEqual(
+            {
+                windows: windows.length,
+                trays: trays.length,
+                monitors: monitors.length,
+            },
+            resourceCountsBeforeSecondProcess,
+            "a secondary process must not create app resources",
+        );
     } finally {
         Module._load = originalLoad;
         fs.rmSync(tempRoot, { recursive: true, force: true });
