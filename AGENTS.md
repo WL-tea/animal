@@ -1,281 +1,138 @@
 # 仓库工作指南
 
-## 协作规则
+## 协作方式
 
-### 用户语言与教学方式
+### 语言与教学
 
 - 默认使用中文交流和撰写说明；代码、命令、标识符和专有名词保留原文。
 - 项目目标不仅是完成应用，也包括理解 Electron、IPC、DOM、CSS、JavaScript、文件监听和数据流。
-- 修改代码时必须解释改动原因、运行机制和相关知识点，不能只汇报结果。
+- 修改代码时应解释改动原因、运行机制和相关知识点，不能只汇报结果。
 
 ### 修改文件前必须确认
 
-每次修改文件前，必须先向用户说明：
+每次修改文件前，先向用户说明：
 
-1. 本次要解决什么问题。
-2. 为什么需要修改这些文件。
-3. 修改后会带来什么效果。
+1. 要解决什么问题；
+2. 为什么需要修改这些文件；
+3. 修改后会带来什么效果；
 4. 涉及哪些关键知识点。
 
-只有用户明确确认后，才能实际修改文件。推荐按“说明问题 → 指出文件 → 解释知识点 → 用户确认 → 改一小步 → 运行验证 → 讲解具体代码”的顺序协作。
+只有用户明确确认后才能修改文件。推荐节奏为：说明问题 → 指出文件 → 解释知识点 → 用户确认 → 小步修改 → 运行验证 → 讲解代码。
+
+### GitHub 远程操作确认
+
+执行 `git push`、删除远程分支、创建或合并 Pull Request，以及其他会更新 GitHub 远程状态的操作前，必须获得用户明确确认。未确认时只能进行本地检查、创建本地分支、暂存或本地提交。用户已经针对该次具体操作授权时，不必重复询问。
 
 ### Superpowers 使用边界
 
 - 默认不使用任何 `superpowers:*` 技能。
 - 仅当用户明确要求，或更高优先级指令强制要求时使用。
 - 必须使用时，先说明原因，只加载完成当前任务所需的最少技能和辅助文件。
-- 常规问答、小型修改和普通验证，不自动串联头脑风暴、规划、调试、测试、审查等技能。
+- 常规问答、小型修改和普通验证，不自动串联头脑风暴、规划、调试、测试或审查技能。
 
-### GitHub 远程操作确认
+## 问题事实来源与续接入口
 
-执行 `git push`、删除远程分支、创建或合并 Pull Request，以及任何会更新 GitHub 远程状态的操作前，必须先停下并询问用户确认。未获得明确确认前，只能完成本地检查、创建本地分支、暂存或本地提交。用户已经针对该次具体操作明确授权时，不必重复询问。
+GitHub Issue 是问题、讨论、验收条件和完成状态的唯一事实来源。不要在仓库文档中维护内容重复的 Issue 清单或逐任务完成日志。开始处理问题前，优先读取对应 Issue 及最新评论；无法访问时应明确说明，不能把读取失败解释为没有问题。
 
-## GitHub Issue 是问题事实来源
+- 未关闭问题：[GitHub Issues](https://github.com/WL-tea/animal/issues?q=is%3Aissue%20state%3Aopen)
+- 当前续接方向：完成托盘单击唤起后，核对 Issue #20、#27 的剩余验收范围，再处理 Issue #1 多显示器拖动与 Issue #5 透明区域点击穿透。
+- 非阻塞优化：合并文件监听事件中的重复快照发布；增加“标准输入格式错误且强制写入失败”的子进程级测试。
 
-GitHub Issue 是项目问题和完成状态的唯一事实来源，不在仓库内维护内容重复的 Issue 清单。当前未关闭问题从 [GitHub Issues](https://github.com/WL-tea/animal/issues?q=is%3Aissue%20state%3Aopen) 查看。
+## 当前架构快照
 
-开始处理问题前，应优先读取对应 Issue，确认现象、复现步骤、预期行为、验收条件和最新讨论。若环境无法访问 GitHub，应明确说明并重试或请用户提供 Issue 链接与内容；不得把“读取失败”解释成“当前没有 Bug”。
+本项目是基于 Electron 的功能型桌面宠物，渲染层使用原生 HTML、CSS 和 JavaScript。
 
-用户在专门的问题记录对话中提出新的具体问题时，应把完整问题创建为 GitHub Issue。后续进展、关联 PR 和关闭状态均以该 Issue 为准。
+### 窗口、托盘与生命周期
 
-## 当前项目状态与续接入口
+- 宠物和详情使用独立 `BrowserWindow`；宠物透明、无边框且不占任务栏，详情是可调整大小的普通工作窗口。
+- 系统托盘提供显示/隐藏桌宠、打开详情、打开设置、切换宠物永久置顶和退出应用。
+- 托盘左键单击显示并唤起桌宠；右键打开原生菜单；双击暂不绑定独立动作。
+- 唤起桌宠会复用现有窗口，在位置不可见时恢复到鼠标所在显示器，并一次性显示、聚焦和前置；不得修改持久化置顶偏好。
+- `app` 拥有唯一 `CCMonitor` 和 `Tray`。隐藏宠物或关闭详情不会停止监控；托盘“退出”或宠物窗口 Alt+F4 才退出应用并释放资源。
+- 详情窗口离开所有显示器可见区域或显示器发生变化时，应恢复到可见工作区。
 
-### 当前基线
+### 设置与 IPC
 
-- `main` 已通过 PR #10 建立首个可运行开发基线。
-- Issue #7 已完成：`app.js` 根据 `cc:update` 判断上下文阈值，并通过 `bubble:say` 请求提醒。
-- Issue #11 已完成：CC 备份读取、文件监听恢复和不可信快照降级处理得到加固。
-- Issue #12 已完成：详情面板中的外部字符串经过 HTML 转义，避免被解释为标签或脚本。
-- Issue #6 已通过 PR #15 完成：用户可以添加、移除并持久化监控项目，设置通过安全 IPC 链路更新 `CCMonitor`。
-- Issue #14 已通过 PR #26 完成：宠物与详情拆分为独立 `BrowserWindow`，详情使用普通窗口层级，桌宠置顶可以即时切换并持久化。
-- Issue #28 已通过 PR #33 完成：仓库提供一套橙色猫咪托盘图标草稿及常用尺寸资源，后续可以替换源图并重新导出。
-- Issue #29 已在 PR #34 完成功能和验收：系统托盘提供桌宠显示/隐藏、详情、设置、置顶和退出入口，监控器所有权已提升到应用生命周期。
-- 当前渲染层已经具备宠物页面与详情页面分离、`app.js` 页面级事件总线，以及 `pet.js`、`bubble.js`、`detail.js`、`settings.js` 的职责拆分。
-- 当前设置结构为 `{ version: 2, projects: [], petAlwaysOnTop: true }`，旧版本配置读取时会安全迁移。
-- 当前设置链路为：`Tray / settings.js -> main.js / preload.js 固定 API -> settings-store.js -> Electron userData/settings.json -> CCMonitor / petWindow`；托盘打开设置通过固定的 `settings:open` 主进程到渲染进程通知完成。
-- 当前 CC 数据流为：`Claude Code statusLine -> claude-statusline-bridge.js -> data/cc-sessions -> cc-monitor.js -> main.js 广播目标 -> 宠物窗口 / 详情窗口`。
-- 当前应用生命周期为：`app.whenReady()` 创建窗口、托盘并启动唯一 `CCMonitor`；隐藏宠物不会停止监控，托盘“退出”或宠物窗口 Alt+F4 才会调用 `app.quit()`，并在退出阶段释放监控器和托盘。
+- 当前设置结构为 `{ version: 2, projects: [], petAlwaysOnTop: true }`，旧配置读取时安全迁移。
+- 设置保存在 `app.getPath("userData")/settings.json`，通过同目录临时文件和 `rename` 原子写入，不属于仓库文件。
+- 设置链路为：`Tray / settings.js -> main.js / preload.js 固定 API -> settings-store.js -> userData/settings.json -> CCMonitor / petWindow`。
+- `preload.js` 只暴露固定能力，不向渲染页面开放任意 IPC channel。托盘打开设置使用固定的 `settings:open` 通知。
 
-以上只是便于续接的基线快照。开始新工作时仍要读取 GitHub 的未关闭 Issue，避免把本文件中的阶段性描述当成实时看板。
+### Claude Code 数据流与安全边界
 
-### 下一步建议
+- 数据流为：`Claude Code statusLine -> claude-statusline-bridge.js -> data/cc-sessions -> cc-monitor.js -> main.js -> 宠物窗口 / 详情窗口`。
+- 快照只保存界面需要的白名单字段，不保存提示词、回复、transcript、凭据或其他不必要的隐私数据。
+- 每个会话使用独立 UUID 快照，并校验会话 ID、文件名和目标路径，防止目录穿越。
+- 数据缺失、损坏或监听故障应安全降级，不能让单个坏文件阻塞其他有效数据源。
+- 所有来自文件、IPC、配置或外部工具的字符串都视为不可信数据。优先使用 `textContent`；必须生成 HTML 时按输出上下文转义。
+- Claude Code `statusLine` 是用户级外部配置，不属于仓库状态；仓库移动后需要同步更新其命令路径。
 
-Issue #29 已完成收尾，当前本地位于与 `origin/main` 同步的 `main`，没有遗留功能分支。开始下一项工作前仍应读取 GitHub 未关闭 Issue 的最新状态和优先级，再从最新 `main` 创建独立短分支。
+## 模块职责
 
-下一项建议优先处理 Issue #30 托盘左键/双击交互，复用现有显示、隐藏和打开详情命令，并明确单击与双击的冲突处理。随后继续核对 Issue #20 和 #27 的剩余验收范围，再衔接 Issue #1 跨多显示器拖动桌宠与 Issue #5 透明空白区域点击穿透。
-
-非阻塞优化包括：合并文件监听事件中的重复快照发布；增加“标准输入格式错误且强制写入失败”的子进程级测试。
-
-### 已完成任务记录：Issue #29
-
-任务名：**系统托盘右键菜单与应用生命周期**。
-
-交付状态：提交 `f337316` 已通过 PR #34 合并到 `main`；Issue #29 已关闭，本地和远程功能分支均已删除。
-
-具体工作：
-
-- 在主进程创建唯一 `Tray`，使用 `assets/tray/tray-icon-32.png`，资源加载失败时以空图像安全降级；
-- 托盘原生菜单提供显示/隐藏桌宠、打开详情、打开设置、桌宠置顶开关和退出，并以稳定顺序和分隔线区分普通操作与退出；
-- 显示/隐藏菜单文案随宠物窗口可见状态更新，详情和设置复用已有详情窗口并带到前台，不重复创建实例；
-- 通过 preload 暴露固定的 `window.windowAPI.onOpenSettings()` 订阅能力，只允许主进程发送 `settings:open`，不向页面暴露任意 IPC channel；
-- 将唯一 `CCMonitor` 的所有权从宠物窗口提升到应用，应用 ready 后启动，在 `before-quit` 停止；托盘在 `will-quit` 销毁；
-- `window-all-closed` 不再自动退出应用，使窗口隐藏或详情关闭后仍可由托盘找回；
-- 宠物窗口使用 `skipTaskbar: true`，不占用 Windows 任务栏栏位；详情窗口保留 `skipTaskbar: false`；
-- 托盘“隐藏桌宠”只调用 `hide()`，而宠物窗口 Alt+F4 触发 `closed` 后调用 `app.quit()`，符合用户明确退出的意图；
-- 扩展主进程生命周期、preload API 和设置 UI 测试，并新增 `docs/notes/15-系统托盘与应用生命周期.md`。
-
-完成时执行的验证：
-
-- 18 个项目 JavaScript 文件通过 `node --check`；
-- `npm test` 的 8 组测试全部通过；
-- `git diff --check` 通过；
-- Windows 手动验收通过托盘菜单、桌宠显示/隐藏、详情与设置复用、置顶切换和应用退出；
-- 人工确认桌宠不再占用任务栏，详情仍显示在任务栏，宠物 Alt+F4 会完整退出而不是隐藏；
-- 退出后确认本项目 Electron 进程数量为 0。
-
-后续限制：Issue #30 的托盘左键/双击交互不在本次范围；托盘图标 A 方案目前是可替换草稿；若未来加入“暂停监控”，应继续由应用级命令统一改变监控状态，避免托盘与其他入口各自维护状态。
-
-### 已完成任务记录：Issue #14
-
-任务名：**独立详情窗口与桌宠置顶策略**。
-
-交付状态：提交 `bba7efc`、`1e1c32b` 已通过 PR #26 合并到 `main`；Issue #14 由 `Closes #14` 自动关闭，本地和远程功能分支均已删除。
-
-具体工作：
-
-- 将原来同一页面内的宠物、气泡和详情面板拆分为宠物窗口与独立详情窗口；
-- 宠物窗口保持透明、无边框和可配置置顶，详情窗口使用普通窗口层级并支持调整大小；
-- 重复双击宠物时复用并唤回已有详情窗口，不重复创建实例；
-- 关闭详情窗口不关闭宠物、不停止 Claude Code 监控；关闭宠物时关闭详情并停止监控器；
-- 使用一个 `CCMonitor` 和主进程广播目标向宠物窗口与详情窗口发送同一份 `cc-update`；
-- 新增 `window.windowAPI.openDetail()`、`closeDetail()` 与置顶设置固定 API，不向渲染页面暴露任意 IPC channel；
-- 设置结构升级为版本 2，新增 `petAlwaysOnTop`，旧配置缺少字段时保持原有默认置顶行为；
-- 项目增删采用“读取—合并—原子保存”，避免覆盖置顶等其他设置字段；
-- 详情标题栏使用 `app-region: drag`，关闭按钮等控件使用 `no-drag` 保持可点击；
-- 详情窗口完全离开所有显示器可见区域、显示器断开或参数变化时恢复到主显示器；
-- 新增独立详情页面、窗口行为设置 UI，并扩展主进程生命周期、preload API、设置存储和设置 UI 测试；
-- 新增 `docs/notes/13-多窗口职责与独立置顶.md`，记录多窗口、IPC、设置迁移和生命周期设计。
-
-完成时执行的验证：
-
-- 18 个项目 JavaScript 文件通过 `node --check`；
-- `npm test` 的 8 组测试全部通过；
-- `git diff --check` 通过；
-- Electron 手动验收通过独立详情窗口、重复打开复用、关闭详情不退出宠物、置顶开关即时生效和重启恢复；
-- 人工验收通过标题栏拖动、交互控件点击和双显示器拖动与窗口找回；
-- 测试进程已经清理，用户设置恢复为 `{ version: 2, projects: [], petAlwaysOnTop: true }`。
-
-收尾结果：PR #26 已合并，Issue #14 已关闭；合并后再次运行自动测试和语法检查，本地 `main` 已同步，工作区干净。
-
-### 已完成任务记录：Issue #6
-
-任务名：**持久化监控项目路径与安全 IPC 设置链路**。
-
-交付状态：提交 `384fe79` 已通过 PR #15 合并到 `main`，合并提交为 `291d794`；Issue #6 已关闭，本地和远程功能分支均已删除。
-
-具体工作：
-
-- 新增 `settings-store.js`，以 `{ version: 1, projects: [] }` 保存设置；
-- 使用 `app.getPath("userData")/settings.json`，不再把用户配置写进仓库；
-- 路径保存前执行去空白、绝对路径规范化和 Windows 大小写去重；
-- 使用“同目录临时文件 + rename”原子写入，损坏 JSON 安全回退为空配置；
-- `main.js` 启动时恢复项目列表，不再默认监控 `__dirname`；
-- 增加 `settings:get-projects`、`settings:add-project`、`settings:remove-project` 三个 IPC handler；
-- `preload.js` 只暴露 `getProjects`、`chooseAndAddProject`、`removeProject` 三个固定方法；
-- 添加前由主进程打开系统目录选择器，并异步检查目录类型和可访问性；
-- 保存成功后调用 `CCMonitor.setProjects()` 和 `refresh()`，无需重启即可更新监控；
-- 已保存路径重新读取时计算 `available`、`missing`、`not-directory`、`unreadable` 派生状态；
-- 新增设置覆盖面板、首次使用空状态、项目卡片、移除按钮和失效路径提示；
-- 外部路径统一通过 `textContent` 渲染，不拼入 `innerHTML`；
-- 新增设置存储、preload API 和设置 UI 测试，并扩展主进程生命周期测试；
-- 新增 `docs/notes/12-用户配置、安全IPC与派生状态.md`，记录 IPC、原子保存和配置状态设计。
-
-完成时执行的验证：
-
-- 18 个项目 JavaScript 文件通过 `node --check`；
-- `npm test` 的 8 组测试全部通过；
-- `git diff --check` 通过；
-- Electron 手动验收通过添加、立即刷新、重启恢复、移除、移除后重启和失效路径提示；
-- 手动验证“移除监控”不会删除真实项目目录；
-- 临时测试目录和测试进程已经清理，用户设置恢复为 `{ version: 1, projects: [] }`。
-
-收尾结果：PR #15 已合并，Issue #6 已由 `Closes #6` 自动关闭；合并后再次运行 8 组测试和 18 个 JavaScript 文件语法检查，结果全部通过。本地 `main` 已同步，工作区干净。
-
-### 继续开发前优先阅读
-
-- `README.md`：运行方式、当前功能和用户配置入口。
-- `docs/superpowers/specs/2026-07-01-desktop-pet-design.md`：产品定位、MVP/V2/V3 路线和模块通信原则。
-- `docs/superpowers/specs/2026-07-10-claude-statusline-monitor-design.md`：statusLine 数据桥接、隐私边界和监控恢复设计。
-- `docs/notes/00-学习地图与协作方式.md`：学习阶段和协作节奏。
-- `docs/notes/04-暴露与事件总线.md`、`06-CC数据入口与单向数据流.md`：事件总线和单向数据流。
-- `docs/notes/05-Git分支与提交节奏.md`、`09-分层测试与GitHub验收.md`：分支、PR、测试和验收工作流。
-- `docs/notes/07-Claude-Code状态栏数据桥接.md`、`08-上下文阈值与状态跨越.md`：CC 数据桥接与告警判断。
-- `docs/notes/10-文件监听故障与不可信数据.md`、`11-innerHTML与外部字符串.md`：监听恢复、输入边界和安全渲染。
-- `docs/notes/12-用户配置、安全IPC与派生状态.md`：Electron 进程边界、preload 白名单、IPC、原子配置保存和项目路径状态。
-- `docs/notes/13-多窗口职责与独立置顶.md`：独立 `BrowserWindow`、跨窗口 IPC、共享监控广播、配置迁移和窗口生命周期。
-- `docs/notes/15-系统托盘与应用生命周期.md`：`Tray` 原生菜单、任务栏策略、窗口隐藏与应用退出的区别，以及应用级资源所有权。
-
-遇到对初学者重要且可复用的新知识时，应新增或更新 `docs/notes/` 学习笔记，文件名按 `序号-主题.md` 命名。
-
-## Git 分支、PR 与合并流程
-
-### `main` 的职责
-
-`main` 表示当前稳定、可运行、可继续开发的基线。项目初始化时，可以先在 `main` 放入最小可识别骨架，例如 README、`.gitignore`、许可证和基础目录；一旦准备开始可独立描述的功能或问题，就从 `main` 创建分支，不在 `main` 上持续堆叠功能开发。
-
-### 推荐节奏
-
-1. 同步并确认本地 `main` 干净、可运行。
-2. 一个 Issue 或一个清晰学习主题创建一个短分支，例如 `cc-alerts`、`fix/watcher-recovery`、`docs/update-agent-guide`。
-3. 完成一个可解释的小目标并通过对应验证后提交；不要混入无关文件。
-4. 第一批有意义的提交推送后，可以创建 Draft PR，让目标、范围和进度尽早可见。
-5. 功能、自动测试、手动验收和文档说明完成后，再把 PR 转为 Ready for review。
-6. PR 准备合并时，先按下方“合并前必须同步 `AGENTS.md`”规则更新续接信息，并把该更新提交、推送到当前功能分支。
-7. 确认远端 PR 已包含最新的 `AGENTS.md` 后，才允许把 PR 合并到 `main`。合并目标是把一个已完成且可独立验证的增量纳入稳定基线，不要求等到整个 MVP 完成。
-8. 合并后同步本地 `main`；确认分支不再需要后删除本地和远程功能分支。删除分支不会删除已经合并的提交历史。
-
-PR 应描述用户可见行为、主要改动模块、验证结果和关联 Issue；涉及界面变化时附截图。提交摘要保持简洁，说明改动目的，可使用简短中文和 emoji。
-
-### 合并前必须同步 `AGENTS.md`
-
-每个任务完成、对应 PR 已满足验收条件并准备合并时，必须先复核并更新 `AGENTS.md`，然后才能进行合并。更新内容应根据任务实际影响至少覆盖以下适用项：
-
-- 当前稳定基线、已完成 Issue/PR 和关键提交；
-- 用户可见行为、模块职责、设置结构、IPC 或数据流变化；
-- 实际执行的自动测试、手动验收和结果；
-- 下一步建议、续接入口及已经失效的旧说明；
-- 对后续开发重要且不能只从代码快速看出的限制或注意事项。
-
-更新后的 `AGENTS.md` 必须提交到当前功能分支并推送到远端，使其成为同一个待合并 PR 的一部分。推送后应检查远端 PR 的最新提交或文件差异，确认该说明已经包含在 PR 中；在此之前不得合并 PR，也不得绕过功能分支直接修改远端 `main`。
-
-`AGENTS.md` 只保存便于后续续接的阶段性快照，不维护与 GitHub Issue 重复的实时任务清单；问题状态、讨论和验收仍以 GitHub Issue 为唯一事实来源。此流程要求不视为对具体 `git push` 或 PR 合并操作的预先授权，执行远程操作前仍须遵守本文件中的 GitHub 远程操作确认规则。
-
-## 项目结构与模块职责
-
-本仓库是基于 Electron 的功能型桌面宠物，渲染层使用原生 HTML、CSS 和 JavaScript。
-
-- `main.js`：Electron 主进程，创建宠物窗口、详情窗口和系统托盘，广播 CC 更新，并拥有应用级监控器、窗口显示状态和退出生命周期。
-- `preload.js`：安全 IPC 桥接层，向渲染进程暴露受控的 `window.ccAPI`、`window.settingsAPI` 和 `window.windowAPI`，包括托盘打开设置所需的固定订阅 API。
-- `settings-store.js`：读取、迁移、规范化并原子保存 Electron 用户设置。
-- `claude-statusline-bridge.js`：Claude Code `statusLine` 命令入口，读取标准输入，并把隐私白名单允许的会话快照原子写入 `data/cc-sessions/`。
-- `cc-monitor.js`：读取和合并 CC 数据，处理 Windows 路径、异常快照、备份来源和监听器恢复。
-- `renderer/index.html`：宠物窗口的页面结构入口，只加载宠物、气泡和对应脚本。
-- `renderer/detail-window.html`：独立详情窗口的页面结构入口，承载项目详情和设置面板。
-- `renderer/css/`：宠物、气泡、详情面板和设置面板的外观。
-- `renderer/js/app.js`：公共事件能力、CC 页面级状态和告警判断，不负责具体 UI DOM 渲染。
-- `renderer/js/pet.js`：只负责 `#pet` 的位置、拖拽、走动和宠物交互。
-- `renderer/js/bubble.js`：只负责 `#bubble` 的文字、显示隐藏、计时和定位。
-- `renderer/js/detail.js`：只负责 `#detail-panel` 及其内部数据渲染。
-- `renderer/js/settings.js`：只负责 `#settings-panel`、项目配置异步状态和设置 DOM，并响应主进程经 preload 转发的打开设置请求。
-- `assets/tray/`：托盘图标源图和常用尺寸导出资源；当前 A 方案为可替换草稿。
-- `docs/notes/`：可复用的学习笔记。
-- `docs/superpowers/specs/`：产品和架构设计文档；目录名是历史命名，不代表日常任务必须调用 Superpowers 技能。
-
-仓库桥接脚本生成的 CC 运行时快照放在 `data/` 下并保持 Git 忽略。Electron 用户设置保存在 `app.getPath("userData")` 指向的应用数据目录，不属于仓库文件。除非用户明确要求，不得把任何本机运行时数据提交到 Git。
+- `main.js`：创建宠物窗口、详情窗口和系统托盘；广播 CC 更新；管理应用级监控器、窗口显示状态和退出生命周期。
+- `preload.js`：向渲染进程暴露受控的 `window.ccAPI`、`window.settingsAPI` 和 `window.windowAPI`。
+- `settings-store.js`：读取、迁移、规范化并原子保存用户设置。
+- `claude-statusline-bridge.js`：读取 Claude Code `statusLine` 标准输入，生成隐私白名单允许的会话快照。
+- `cc-monitor.js`：读取和合并 CC 数据，处理 Windows 路径、异常快照、备份来源和监听恢复。
+- `renderer/index.html`：宠物窗口页面入口。
+- `renderer/detail-window.html`：详情与设置窗口页面入口。
+- `renderer/js/app.js`：页面级事件能力、CC 状态和告警判断，不直接负责具体 UI DOM。
+- `renderer/js/pet.js`：宠物位置、拖拽、走动和交互。
+- `renderer/js/bubble.js`：气泡文本、显示隐藏、计时和定位。
+- `renderer/js/detail.js`：详情面板数据渲染。
+- `renderer/js/settings.js`：设置面板、项目配置异步状态和主进程打开设置请求。
+- `renderer/css/`：宠物、气泡、详情和设置外观。
+- `assets/tray/`：托盘图标源图和常用尺寸资源；当前 A 方案是可替换草稿。
+- `docs/notes/`：可复用的学习笔记，不承担 Issue 状态跟踪。
+- `docs/superpowers/specs/`：产品与架构设计文档；目录名是历史命名，不代表日常任务必须调用 Superpowers。
 
 ## 架构原则
 
-交互采用三层模型：宠物本体、临时对话气泡、详情/设置面板。宠物本体保持“宠物是主角”，不要直接把说明文字贴在宠物身上。
+- 交互采用宠物本体、临时气泡、详情/设置三层模型，保持“宠物是主角”。
+- 模块之间优先通过 `app.js` 事件总线通信，遵循单向数据流和“谁负责 UI，谁操作对应 DOM”。
+- 当前主要页面事件包括 `detail:open`、`bubble:say`、`pet:moved` 和 `cc:update`。
+- HTML 保留结构，CSS 负责外观，JavaScript 负责行为；原始数字用于计算，格式化结果只用于展示。
+- 窗口、托盘、监听器和定时器必须有明确所有者，并在对应生命周期结束时释放。
+- 隐藏窗口、关闭普通窗口和退出应用是不同操作，不得混用。
 
-模块采用事件驱动和单向数据流。模块之间不直接调用对方的 UI 函数，优先通过 `app.js` 事件总线通信。当前主要事件包括：
+## Git 与交付流程
 
-- `detail:open`：请求打开详情面板，由 `detail.js` 执行。
-- `bubble:say`：请求显示一句气泡文本，由 `bubble.js` 执行。
-- `pet:moved`：通知宠物位置改变，由 `bubble.js` 重新定位。
-- `cc:update`：发布新的 CC 数据，由详情渲染和告警状态逻辑消费。
+1. 从干净、同步的 `main` 创建一个对应单一 Issue 或清晰主题的短分支。
+2. 小步实现并运行与风险相称的验证，不混入无关文件。
+3. 第一批有意义的提交可创建 Draft PR；功能和验收完成后再转为 Ready。
+4. PR 描述用户可见行为、主要模块、验证结果和关联 Issue；界面变化按需要附截图。
+5. 合并前检查 `AGENTS.md` 是否仍准确。只有架构、协作流程、关键限制或续接入口发生变化时才更新；不要追加逐任务日志、提交清单或可从 GitHub 查询的历史。
+6. 确认远端 PR 包含必要说明且验收通过后再合并；合并后同步 `main` 并清理不再需要的本地和远程功能分支。
 
-遵循“谁负责 UI，谁操作对应 DOM”。HTML 尽量只保留结构，CSS 负责外观，JavaScript 负责行为。计算逻辑和展示格式分开：先使用原始数字计算，再用 `toLocaleString()` 等方法生成展示文本。
-
-所有来自文件、IPC、用户配置或外部工具的字符串都视为不可信数据。优先使用 `textContent`；必须生成 HTML 时先按输出上下文转义。文件监听器、窗口和定时器必须有明确的所有者，并在生命周期结束时释放。
-
-## Claude Code 数据与本机配置边界
-
-- 快照只保存界面需要的白名单字段，不保存提示词、回复、transcript 内容或凭据。
-- 每个会话使用独立 UUID 快照，并校验会话 ID、文件名和目标路径，防止目录穿越。
-- 数据缺失或损坏时应降级为“上下文数据不可用”，不能让单个坏文件中断全部监控。
-- 隐藏或关闭普通窗口不会停止应用级监控器，也不得结束 Claude Code 会话；只有应用退出流程负责停止监控器并销毁托盘。
-
-Claude Code 的 `statusLine` 设置属于用户级外部配置，不属于仓库提交，也不是项目状态的事实来源。本机当前命令为 `node "E:/kaifa/animal/claude-statusline-bridge.js"`；仓库移动后需要同步更新用户设置。回滚信息保存在被忽略的 `data/statusline-backup.json`。不要把用户名、凭据或其他机器私有配置写进仓库文档。
+远程操作仍必须遵守单独确认规则。`main` 始终代表稳定、可运行、可继续开发的基线。
 
 ## 构建、测试与验证
 
 - `npm install`：安装 Electron 和项目依赖。
-- `npm start`：通过 Electron 启动应用。
+- `npm start`：启动 Electron 应用。
 - `npm run start:node`：用 Node 运行 `main.js`，再转交给 Electron。
 - `npm run check:electron`：检查 Electron 包在普通 Node 环境中的解析结果。
 - `npm test`：串行运行当前 8 个 Node 测试脚本。
 - `node --check <file>`：检查单个 JavaScript 文件语法。
 
-项目当前没有 `build` 脚本，不要运行或在文档中宣称存在 `npm run build`。
-
-验证强度按改动风险选择：
+项目当前没有 `build` 脚本，不要宣称或运行 `npm run build`。
 
 - 纯文档改动：至少运行 `git diff --check`，复核链接、命令和 Git 状态。
 - JavaScript 改动：运行相关文件的 `node --check` 和 `npm test`。
-- Electron 生命周期、UI 或 CC 数据改动：除自动测试外，运行 `npm start` 并进行对应手动验收。
+- Electron 生命周期、UI 或 CC 数据改动：除自动测试外，运行 `npm start` 并完成对应手动验收。
+- 安全相关改动：确认快照不含隐私字段、外部字符串不会被解释成 HTML、坏数据源不会阻塞其他有效数据。
 
-UI 与 CC 数据的基础手动场景包括：启动后只显示桌宠本体；双击后打开详情面板；详情能显示 CC 数据；会话继续输入后百分比自动更新；跨越告警阈值时气泡只按设计提醒；关闭桌宠不结束 Claude Code。
+提交或交接前必须说明实际运行的验证和结果；未运行的测试要明确标注，不能用推测代替。
 
-安全相关改动还应检查：快照不含提示词、回复、transcript 或凭据；外部字符串不会被解释成 HTML；坏快照和监听故障不会阻塞其他有效数据源。
+## 优先阅读
 
-提交或交接前，应说明实际运行了哪些验证及其结果；没有运行的测试必须明确标注，不能用推测代替结果。
+- `README.md`：运行方式、当前功能和配置入口。
+- `docs/superpowers/specs/2026-07-01-desktop-pet-design.md`：产品定位、路线与模块通信原则。
+- `docs/superpowers/specs/2026-07-10-claude-statusline-monitor-design.md`：statusLine 数据桥接、隐私边界与监控恢复。
+- `docs/notes/00-学习地图与协作方式.md`：学习阶段和协作节奏。
+- `docs/notes/04-暴露与事件总线.md`、`06-CC数据入口与单向数据流.md`：事件总线和数据流。
+- `docs/notes/09-分层测试与GitHub验收.md`：测试和 GitHub 验收方式。
+- `docs/notes/10-文件监听故障与不可信数据.md`、`11-innerHTML与外部字符串.md`：故障恢复与安全渲染。
+- `docs/notes/12-用户配置、安全IPC与派生状态.md`：设置、IPC 和路径状态。
+- `docs/notes/13-多窗口职责与独立置顶.md`：多窗口、置顶和窗口生命周期。
+- `docs/notes/15-系统托盘与应用生命周期.md`：托盘交互、任务栏策略和应用级资源所有权。
