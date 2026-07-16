@@ -71,6 +71,7 @@ const document = {
 };
 
 const calls = [];
+let openSettingsFromMain = null;
 const context = {
     console,
     document,
@@ -107,6 +108,11 @@ const context = {
                 return { ok: true, petAlwaysOnTop: enabled };
             },
         },
+        windowAPI: {
+            onOpenSettings: (callback) => {
+                openSettingsFromMain = callback;
+            },
+        },
     },
 };
 
@@ -119,6 +125,12 @@ async function run() {
     vm.createContext(context);
     vm.runInContext(settingsJs, context);
     domReadyHandler();
+    assert.strictEqual(typeof openSettingsFromMain, "function");
+
+    await openSettingsFromMain();
+    assert.strictEqual(elements["#settings-panel"].hidden, false);
+    context.hideSettings();
+    assert.strictEqual(elements["#settings-panel"].hidden, true);
 
     const showPromise = context.showSettings();
     assert.strictEqual(elements["#settings-add-project"].disabled, true);

@@ -22,4 +22,7 @@ contextBridge.exposeInMainWorld("settingsAPI", {
 contextBridge.exposeInMainWorld("windowAPI", {
     openDetail: () => ipcRenderer.invoke("window:open-detail"),
     closeDetail: () => ipcRenderer.invoke("window:close-detail"),
+    onOpenSettings: (callback) => {
+        ipcRenderer.on("settings:open", () => callback());
+    },
 });

@@ -204,6 +204,7 @@ async function updatePetAlwaysOnTop() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+    window.windowAPI?.onOpenSettings?.(showSettings);
     document.querySelector("#settings-open")?.addEventListener("click", showSettings);
     document.querySelector("#settings-close")?.addEventListener("click", hideSettings);
     document.querySelector("#settings-add-project")?.addEventListener("click", addProject);
