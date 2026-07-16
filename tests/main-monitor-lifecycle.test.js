@@ -38,6 +38,9 @@ class FakeBrowserWindow {
         this.showCount = 0;
         this.hideCount = 0;
         this.focusCount = 0;
+        this.moveTopCount = 0;
+        this.restoreCount = 0;
+        this.minimized = false;
         this.alwaysOnTopValues = [];
         this.bounds = { x: 100, y: 100, width: options.width, height: options.height };
         this.webContents = {
@@ -72,6 +75,19 @@ class FakeBrowserWindow {
 
     focus() {
         this.focusCount += 1;
+    }
+
+    moveTop() {
+        this.moveTopCount += 1;
+    }
+
+    isMinimized() {
+        return this.minimized;
+    }
+
+    restore() {
+        this.minimized = false;
+        this.restoreCount += 1;
     }
 
     close() {
@@ -118,7 +134,16 @@ class FakeTray {
         this.destroyed = false;
         this.tooltip = "";
         this.contextMenu = null;
+        this.handlers = {};
         trays.push(this);
+    }
+
+    on(eventName, handler) {
+        this.handlers[eventName] = handler;
+    }
+
+    emit(eventName) {
+        this.handlers[eventName]?.();
     }
 
     setToolTip(tooltip) {
@@ -247,6 +272,27 @@ async function run() {
         tray.contextMenu.getMenuItemById("toggle-pet").click();
         assert.strictEqual(petWindow.isVisible(), true);
         assert.strictEqual(tray.contextMenu.getMenuItemById("toggle-pet").label, "隐藏桌宠");
+
+        tray.contextMenu.getMenuItemById("toggle-pet").click();
+        petWindow.bounds = { x: 5000, y: 5000, width: 400, height: 600 };
+        petWindow.minimized = true;
+        const settingsBeforeTrayClick = fs.readFileSync(path.join(tempRoot, "settings.json"), "utf-8");
+        tray.emit("click");
+        tray.emit("click");
+        assert.strictEqual(windows.length, 1, "repeated tray clicks should reuse the pet window");
+        assert.strictEqual(petWindow.isVisible(), true, "tray click should reveal the pet");
+        assert.strictEqual(petWindow.restoreCount, 1, "tray click should restore a minimized pet");
+        assert.strictEqual(petWindow.focusCount, 3, "each tray click should intentionally request focus");
+        assert.strictEqual(petWindow.moveTopCount, 3, "each tray click should move the pet forward once");
+        assert.ok(petWindow.bounds.x >= 0 && petWindow.bounds.x < primaryWorkArea.width);
+        assert.ok(petWindow.bounds.y >= 0 && petWindow.bounds.y < primaryWorkArea.height);
+        assert.deepStrictEqual(petWindow.alwaysOnTopValues, [], "tray click must not change always-on-top");
+        assert.strictEqual(
+            fs.readFileSync(path.join(tempRoot, "settings.json"), "utf-8"),
+            settingsBeforeTrayClick,
+            "tray click must not persist preference changes",
+        );
+        assert.strictEqual(tray.handlers["double-click"], undefined, "double click is intentionally unbound");
 
         appHandlers.activate();
         assert.strictEqual(windows.length, 1, "activate should reuse the existing pet window");
