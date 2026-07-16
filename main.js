@@ -139,10 +139,35 @@ function stopMonitor() {
     ccMonitor = null;
 }
 
+function ensurePetWindowVisible() {
+    if (!isWindowAvailable(petWindow)) return;
+
+    const bounds = petWindow.getBounds();
+    const isRecoverable = screen.getAllDisplays().some(({ workArea }) => {
+        const overlapWidth = Math.max(0, Math.min(bounds.x + bounds.width, workArea.x + workArea.width)
+            - Math.max(bounds.x, workArea.x));
+        const overlapHeight = Math.max(0, Math.min(bounds.y + bounds.height, workArea.y + workArea.height)
+            - Math.max(bounds.y, workArea.y));
+        return overlapWidth >= 80 && overlapHeight >= 80;
+    });
+
+    if (isRecoverable) return;
+
+    const cursor = screen.getCursorScreenPoint();
+    const { workArea } = screen.getDisplayNearestPoint(cursor);
+    petWindow.setBounds({
+        x: Math.round(workArea.x + Math.max(0, (workArea.width - bounds.width) / 2)),
+        y: Math.round(workArea.y + Math.max(0, (workArea.height - bounds.height) / 2)),
+    });
+}
+
 function showPetWindow() {
     const win = createPetWindow();
+    ensurePetWindowVisible();
+    if (win.isMinimized()) win.restore();
     win.show();
     win.focus();
+    win.moveTop();
     refreshTrayMenu();
     return win;
 }
@@ -210,14 +235,13 @@ function createTray() {
 
     tray = new Tray(trayImage);
     tray.setToolTip("桌宠");
+    tray.on("click", showPetWindow);
     refreshTrayMenu();
     return tray;
 }
 
 function createPetWindow() {
     if (isWindowAvailable(petWindow)) {
-        petWindow.show();
-        petWindow.focus();
         return petWindow;
     }
 
