@@ -239,7 +239,7 @@ async function run() {
             return originalLoad.call(this, request, parent, isMain);
         };
 
-        require("../main");
+        const { resolveTrayIconPath } = require("../main");
         readyHandler();
 
         assert.strictEqual(singleInstanceLockRequestCount, 1, "startup should request one instance lock");
@@ -251,7 +251,21 @@ async function run() {
         assert.match(petWindow.loadedFile, /renderer[\\/]index\.html$/);
         assert.strictEqual(petWindow.options.alwaysOnTop, true);
         assert.strictEqual(petWindow.options.skipTaskbar, true);
-        assert.match(tray.image, /assets[\\/]tray[\\/]tray-icon-32\.png$/);
+        assert.match(tray.image, /assets[\\/]tray[\\/]tray-icon\.ico$/);
+        assert.match(
+            resolveTrayIconPath({
+                baseDir: path.resolve(__dirname, ".."),
+                platform: "win32",
+                fileExists: (iconPath) => iconPath.endsWith("tray-icon-32.png"),
+            }),
+            /assets[\\/]tray[\\/]tray-icon-32\.png$/,
+            "Windows should fall back to the PNG when the ICO is unavailable",
+        );
+        assert.strictEqual(
+            resolveTrayIconPath({ fileExists: () => false }),
+            null,
+            "missing tray assets should use the safe empty-image fallback",
+        );
         assert.strictEqual(tray.tooltip, "桌宠");
         assert.deepStrictEqual(
             tray.contextMenu.items.map((item) => item.type === "separator" ? "separator" : item.id),

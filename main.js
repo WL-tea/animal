@@ -56,6 +56,23 @@ let isQuitting = false;
 
 const DETAIL_WINDOW_SIZE = { width: 680, height: 520 };
 
+function resolveTrayIconPath({
+    baseDir = __dirname,
+    platform = process.platform,
+    fileExists = fs.existsSync,
+} = {}) {
+    const filenames = platform === "win32"
+        ? ["tray-icon.ico", "tray-icon-32.png"]
+        : ["tray-icon-32.png"];
+
+    for (const filename of filenames) {
+        const iconPath = path.join(baseDir, "assets", "tray", filename);
+        if (fileExists(iconPath)) return iconPath;
+    }
+
+    return null;
+}
+
 function getSettingsPath() {
     return path.join(app.getPath("userData"), "settings.json");
 }
@@ -235,10 +252,10 @@ function refreshTrayMenu() {
 function createTray() {
     if (tray) return tray;
 
-    const iconPath = path.join(__dirname, "assets", "tray", "tray-icon-32.png");
-    const trayImage = fs.existsSync(iconPath) ? iconPath : nativeImage.createEmpty();
-    if (trayImage !== iconPath) {
-        console.error(`[tray] icon not found: ${iconPath}`);
+    const iconPath = resolveTrayIconPath();
+    const trayImage = iconPath ?? nativeImage.createEmpty();
+    if (!iconPath) {
+        console.error("[tray] icon not found; using an empty fallback image");
     }
 
     tray = new Tray(trayImage);
@@ -527,3 +544,5 @@ app.on("will-quit", () => {
 
 // 托盘是应用常驻入口；所有窗口关闭后仍保持后台监控。
 app.on("window-all-closed", () => {});
+
+module.exports = { resolveTrayIconPath };
